@@ -39,7 +39,12 @@ OPTIMIZERS = {
     'rmsprop': lambda model, args: optim.RMSprop(model.parameters(), lr=args.lr, momentum=args.momentum),
 }
 
-TMPDIR = Path(f'/run/user/{os.getuid()}')
+if hasattr(os, 'getuid'):
+    TMPDIR = Path(f'/run/user/{os.getuid()}')
+else:
+    import tempfile
+    TMPDIR = Path(tempfile.gettempdir()) / 'deeprm-agent'
+    TMPDIR.mkdir(parents=True, exist_ok=True)
 Experience = namedtuple(
     'Experience',
     field_names='state action reward'.split()
@@ -281,6 +286,8 @@ def main():
     if args.load is not None:
         model.load_state_dict(torch.load(args.load))
     model.share_memory()
+
+    Path('checkpoint').mkdir(exist_ok=True)
 
     writer = SummaryWriter()
     loss_queue = mp.Queue()
