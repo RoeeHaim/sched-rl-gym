@@ -1,0 +1,4 @@
+# Treat workload traces as binary so line-ending (CRLF) conversion never
+# rewrites their bytes — important for bit-for-bit reproducibility.
+*.gz   -text
+*.swf  -text
