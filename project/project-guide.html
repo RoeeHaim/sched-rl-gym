@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>פרוייקט גמר — למידת חיזוק לתזמון משימות באשכולות HPC</title>
+<style>
+  @page { size: A4; margin: 20mm 17mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Arial", sans-serif;
+    font-size: 11.5pt; line-height: 1.65; color: #1a1a2e;
+    margin: 0; direction: rtl;
+  }
+  h1 { font-size: 22pt; color: #16325c; border-bottom: 3px solid #16325c; padding-bottom: 6px; margin-top: 0; }
+  h2 { font-size: 16pt; color: #16325c; border-bottom: 1.5px solid #b8c6db; padding-bottom: 4px; margin-top: 28px; page-break-after: avoid; }
+  h3 { font-size: 13pt; color: #205493; margin-top: 20px; page-break-after: avoid; }
+  h4 { font-size: 11.5pt; color: #205493; margin-bottom: 4px; page-break-after: avoid; }
+  .cover { text-align: center; padding-top: 120px; page-break-after: always; }
+  .cover h1 { border: none; font-size: 26pt; }
+  .cover .sub { font-size: 14pt; color: #444; margin-top: 18px; }
+  .cover .meta { margin-top: 60px; font-size: 12pt; color: #333; line-height: 2; }
+  .toc { page-break-after: always; }
+  .toc ol { line-height: 2; }
+  code, pre {
+    font-family: "Consolas", "Courier New", monospace;
+    direction: ltr; unicode-bidi: embed;
+  }
+  code { background: #eef2f7; padding: 1px 5px; border-radius: 3px; font-size: 10pt; }
+  pre {
+    background: #f4f6fa; border: 1px solid #d4dce8; border-right: 4px solid #205493;
+    padding: 10px 14px; border-radius: 4px; font-size: 9.5pt; line-height: 1.45;
+    text-align: left; overflow-x: hidden; white-space: pre-wrap; page-break-inside: avoid;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 10.5pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #b8c6db; padding: 6px 10px; text-align: right; }
+  th { background: #e3ebf5; color: #16325c; }
+  .ltr { direction: ltr; unicode-bidi: embed; display: inline-block; }
+  .note {
+    background: #fff8e6; border: 1px solid #e6cf8b; border-right: 4px solid #d9a514;
+    padding: 10px 14px; border-radius: 4px; margin: 12px 0; page-break-inside: avoid;
+  }
+  .important {
+    background: #e8f4ec; border: 1px solid #9bc7a8; border-right: 4px solid #2e8b57;
+    padding: 10px 14px; border-radius: 4px; margin: 12px 0; page-break-inside: avoid;
+  }
+  .formula {
+    background: #f0f4fa; padding: 10px 16px; margin: 10px 30px; border-radius: 4px;
+    text-align: center; direction: ltr; font-family: "Cambria Math", "Georgia", serif; font-size: 12pt;
+    page-break-inside: avoid;
+  }
+  .pagebreak { page-break-before: always; }
+  .small { font-size: 9.5pt; color: #555; }
+  ul li, ol li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== COVER ===================== -->
+<div class="cover">
+  <h1>למידת חיזוק לתזמון משימות<br>באשכולות מחשוב-על (HPC)</h1>
+  <div class="sub">מסמך הסבר מקיף — רקע תיאורטי, שחזור המאמר, ומדריך קוד מלא</div>
+  <div class="meta">
+    <b>המאמר המשוחזר:</b><br>
+    Renato L. F. Cunha &amp; Luiz Chaimowicz,<br>
+    <i>"An SMDP approach for Reinforcement Learning in HPC cluster schedulers"</i>,<br>
+    Future Generation Computer Systems 139 (2023) 239–252<br>
+    DOI: 10.1016/j.future.2022.09.025<br><br>
+    <b>קוד המקור:</b> github.com/renatolfc/sched-rl-gym (ענף smdp)<br>
+    <b>מנחה:</b> פרופ' גל קמינקא, אוניברסיטת בר-אילן<br>
+    <b>תאריך:</b> יוני 2026
+  </div>
+</div>
+
+<!-- ===================== TOC ===================== -->
+<div class="toc">
+<h2>תוכן עניינים</h2>
+<ol>
+  <li>הבעיה: תזמון משימות באשכול HPC</li>
+  <li>רקע: למידת חיזוק (Reinforcement Learning) מאפס</li>
+  <li>המאמר: מ-DeepRM ל-SMDP</li>
+  <li>יומן עבודה — מה נעשה כדי להריץ ולשחזר (יעד 1)</li>
+  <li>מדריך קוד מלא: sched-rl-gym קובץ-קובץ</li>
+  <li>סקריפט האימון deeprm-agent.py — אלגוריתם REINFORCE לעומק</li>
+  <li>איך מריצים הכל — פקודות</li>
+  <li>תוצאות, מסקנות ביניים, וצעדים הבאים (יעדים 2–3)</li>
+  <li>נספח: מילון מונחים</li>
+</ol>
+</div>
+
+<!-- ===================== CH 1 ===================== -->
+<h2>1. הבעיה: תזמון משימות באשכול HPC</h2>
+
+<p>אשכול מחשוב-על (HPC cluster) הוא אוסף גדול של מעבדים שמשרת קהילת משתמשים. משתמשים שולחים <b>משימות (jobs)</b>: כל משימה מבקשת כמות מעבדים מסוימת ומשך ריצה מסוים. בדרך כלל אין מספיק משאבים פנויים להריץ הכל מיד, ולכן משימות ממתינות ב<b>תור</b>. ה<b>מתזמן (scheduler)</b> הוא הרכיב שמחליט, בכל רגע, איזו משימה מהתור תקבל משאבים ותתחיל לרוץ.</p>
+
+<p>החלטות התזמון משפיעות דרמטית על חוויית המשתמשים. המדד המקובל לאיכות תזמון הוא ה-<b>slowdown</b> של משימה — פי כמה המשימה "התעכבה" ביחס לאורך הריצה שלה:</p>
+
+<div class="formula">slowdown(j) = (finish<sub>j</sub> − submit<sub>j</sub>) / runtime<sub>j</sub> = (wait<sub>j</sub> + runtime<sub>j</sub>) / runtime<sub>j</sub></div>
+
+<p>למשל: משימה של דקה שחיכתה 9 דקות קיבלה slowdown של 10 — חוויה איומה. משימה של 10 שעות שחיכתה 9 דקות בקושי הרגישה. לכן slowdown "מעניש" במיוחד עיכוב של משימות קצרות. קיים גם <b>bounded slowdown</b>, שמגביל את המכנה מלמטה (בדרך כלל ב-10 שניות) כדי שמשימות זעירות לא ינפחו את המדד (ממומש ב-<code>job.py</code> בשם <code>bounded_slowdown</code>).</p>
+
+<h3>1.1 מתזמנים קלאסיים (היוריסטיקות)</h3>
+<table>
+<tr><th>מתזמן</th><th>כלל ההחלטה</th><th>בקוד</th></tr>
+<tr><td>FCFS / FIFO</td><td>לפי סדר הגעה</td><td><code>fifo_scheduler.py</code></td></tr>
+<tr><td>SJF (Shortest Job First)</td><td>המשימה הקצרה ביותר קודם — מצוין ל-slowdown</td><td><code>sjf_scheduler.py</code></td></tr>
+<tr><td>Backfilling / EASY</td><td>FCFS + "מילוי חורים": משימות קטנות עוקפות אם לא יעכבו את ראש התור</td><td><code>backfilling_scheduler.py</code>, <code>easy_scheduler.py</code></td></tr>
+<tr><td>Packer</td><td>בוחר משימה שממקסמת ניצול משאבים (יישור עם הפנוי)</td><td><code>packer_scheduler.py</code></td></tr>
+<tr><td>Random</td><td>בחירה אקראית — baseline תחתון</td><td><code>random_scheduler.py</code></td></tr>
+</table>
+
+<p><b>הרעיון של המאמר:</b> במקום לקבע כלל ידני, ניתן ל<b>למוד</b> את כלל ההחלטה מהנתונים עצמם בעזרת למידת חיזוק. המתזמן הנלמד יכול לתפוס דפוסים שכללים פשוטים מפספסים (למשל: "כדאי להשאיר חור פנוי כי בעוד רגע תגיע משימה גדולה").</p>
+
+<!-- ===================== CH 2 ===================== -->
+<h2 class="pagebreak">2. רקע: למידת חיזוק מאפס</h2>
+
+<h3>2.1 תהליך החלטה מרקובי (MDP)</h3>
+<p>למידת חיזוק (RL) עוסקת בסוכן שלומד להתנהג בסביבה מתוך ניסוי וטעייה. הפורמליזם המתמטי הוא <b>MDP — Markov Decision Process</b>, חמישייה ⟨S, A, P, R, γ⟩:</p>
+<ul>
+  <li><b>S — מרחב מצבים:</b> כל מה שהסוכן רואה. אצלנו: "צילום מצב" של האשכול והתור.</li>
+  <li><b>A — מרחב פעולות:</b> ההחלטות האפשריות. אצלנו: "תזמן את משימה מספר i מהתור" או "אל תעשה כלום".</li>
+  <li><b>P(s′|s,a) — דינמיקת מעברים:</b> איך העולם מתקדם. אצלנו: הסימולטור — משימות מגיעות, רצות ומסתיימות.</li>
+  <li><b>R(s,a) — תגמול:</b> משוב מספרי מיידי. אצלנו: שלילי, ביחס לכמות הממתינים (ראו 2.4).</li>
+  <li><b>γ — מקדם ניכיון (discount):</b> כמה שווה תגמול עתידי לעומת מיידי (0 ≤ γ ≤ 1).</li>
+</ul>
+<p>תכונת מרקוב: ההתפלגות של המצב הבא תלויה רק במצב הנוכחי ובפעולה — לא בהיסטוריה. <b>מדיניות (policy)</b> π(a|s) היא הסתברות לבחור פעולה a במצב s. מטרת הלמידה: למצוא מדיניות שממקסמת את ה<b>תשואה (return)</b> — סכום התגמולים המנוכה:</p>
+<div class="formula">G<sub>t</sub> = r<sub>t</sub> + γ·r<sub>t+1</sub> + γ²·r<sub>t+2</sub> + … = Σ<sub>k≥0</sub> γ<sup>k</sup> r<sub>t+k</sub></div>
+
+<h3>2.2 Policy Gradient ו-REINFORCE</h3>
+<p>יש שתי משפחות עיקריות של אלגוריתמי RL: מבוססי-ערך (כמו Q-learning, שלומדים "כמה שווה" כל מצב) ומבוססי-מדיניות (שלומדים את π ישירות). הקוד שלנו משתמש בגישה השנייה: רשת נוירונים עם פרמטרים θ מקבלת מצב ופולטת התפלגות על פעולות — π<sub>θ</sub>(a|s). משפט ה-Policy Gradient נותן את כיוון השיפור:</p>
+<div class="formula">∇<sub>θ</sub> J(θ) = E<sub>π</sub> [ Σ<sub>t</sub> ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>) · G<sub>t</sub> ]</div>
+<p>אינטואיציה: <b>הגדל את ההסתברות של פעולות שהובילו לתשואה גבוהה, הקטן את אלה שהובילו לנמוכה.</b> אלגוריתם REINFORCE (‏Williams, 1992) מממש זאת ישירות: שחק אפיזודות שלמות עם המדיניות הנוכחית, חשב לכל צעד את G<sub>t</sub>, ועדכן את θ בכיוון הגרדיאנט.</p>
+
+<h3>2.3 בעיית השונות וה-Baseline</h3>
+<p>הבעיה המעשית של REINFORCE היא <b>שונות גבוהה</b>: התשואות משתנות בפראות בין אפיזודות, והגרדיאנט רועש. הפתרון: להחסיר מ-G<sub>t</sub> ערך ייחוס b<sub>t</sub> ("baseline") שאינו תלוי בפעולה — זה לא מטה את הגרדיאנט אבל מקטין שונות מאוד:</p>
+<div class="formula">∇<sub>θ</sub> J(θ) = E [ Σ<sub>t</sub> ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>) · (G<sub>t</sub> − b<sub>t</sub>) ]</div>
+<p>הביטוי (G<sub>t</sub> − b<sub>t</sub>) נקרא <b>advantage</b>: "כמה הפעולה הזו הייתה טובה יותר מהממוצע". בקוד שלנו (כמו ב-DeepRM המקורי), b<sub>t</sub> הוא ממוצע התשואה בזמן t על פני כל האפיזודות באצווה — מימוש ב-<code>compute_baselines</code> שבסקריפט <code>deeprm-agent.py</code>.</p>
+
+<h3>2.4 ולמה SMDP? לב המאמר</h3>
+<p>ב-MDP רגיל הסוכן מחליט <b>בכל צעד זמן</b>. אבל בתזמון, ברוב צעדי הזמן אין בכלל מה להחליט — האשכול מלא ושום משימה לא נכנסת. הסוכן "מבזבז" אינטראקציות על מצבים שבהם לאף פעולה אין השפעה, והאשראי על תוצאות מתמרח על פני המון צעדים סרק — מה שמקשה על הלמידה.</p>
+<p><b>Semi-MDP (SMDP)</b> הוא הכללה שבה פעולה יכולה להימשך זמן משתנה: הסוכן מחליט רק ב"נקודות החלטה" אמיתיות, והזמן שביניהן נצבר עם ניכיון מתאים. אם בין שתי החלטות עברו τ צעדים עם תגמולי ביניים r<sub>1</sub>…r<sub>τ</sub>, התגמול האפקטיבי של המעבר הוא:</p>
+<div class="formula">R = Σ<sub>k=1..τ</sub> γ<sup>k−1</sup> r<sub>k</sub> , &nbsp;&nbsp; והניכיון למצב הבא הוא γ<sup>τ</sup></div>
+<p>זה בדיוק מה שהמאמר מציע לתזמון: <b>נקודת החלטה = רגע שבו משימה כלשהי בתור יכולה להיכנס לאשכול.</b> בין נקודות כאלה הסימולטור פשוט מקדם את הזמן בעצמו. בקוד זה ההבדל בין <code>TimeBasedDeepRmSimulator</code>‏ (MDP) ל-<code>EventBasedDeepRmSimulator</code>‏ (SMDP) — ראו פרק 5.6.</p>
+
+<!-- ===================== CH 3 ===================== -->
+<h2 class="pagebreak">3. המאמר: מ-DeepRM ל-SMDP</h2>
+
+<h3>3.1 הבסיס: DeepRM (HotNets 2016)</h3>
+<p>המאמר של Cunha &amp; Chaimowicz בנוי על DeepRM של Mao et al — העבודה הראשונה שהראתה ש-RL עמוק יכול ללמוד תזמון. הרעיונות המרכזיים של DeepRM, שכולם ממומשים בריפו:</p>
+<ul>
+  <li><b>המצב כתמונה:</b> מצב האשכול מקודד כמטריצה דמוית-תמונה. ציר אנכי = זמן עתידי (time_horizon, ‏20 צעדים), ציר אופקי = משאבים (10 מעבדים + 10 יחידות זיכרון). תא צבוע = תפוס. לצד "תמונת" האשכול מוצגות עד 5 משימות ראשונות מהתור (job slots) באותו קידוד, ועמודת backlog שסופרת כמה משימות נוספות ממתינות מעבר ל-slots.</li>
+  <li><b>פעולה:</b> מספר בין 0 ל-5: "הכנס את משימה i מה-slots לאשכול" (0–4) או "המתן" (5). אם הפעולה לא חוקית (המשימה לא נכנסת) — היא מנוטרלת והזמן מתקדם.</li>
+  <li><b>תגמול:</b> בכל צעד זמן, <span class="ltr">R = −Σ<sub>j∈J</sub> 1/T<sub>j</sub></span> כאשר J היא קבוצת המשימות במערכת ו-T<sub>j</sub> זמן הריצה של משימה j. הסכום הזה נבחר כי מקסום שלו שקול מתמטית למזעור ה-slowdown הממוצע (כל משימה "משלמת" 1/T בכל צעד המתנה — בדיוק התרומה שלה ל-slowdown). ממומש ב-<code>base.py</code>: <code>compute_reward</code>.</li>
+  <li><b>אלגוריתם:</b> REINFORCE עם baseline לפי צעד-זמן (פרק 2.3).</li>
+</ul>
+
+<h3>3.2 התרומות של המאמר הנוכחי</h3>
+<ol>
+  <li><b>מידול SMDP:</b> הגדרת נקודות החלטה מבוססות-אירועים במקום צעדי זמן קבועים, עם צבירת תגמולים מנוכה (פרק 2.4). זו התרומה התיאורטית המרכזית, והיא משפרת מהירות למידה ואיכות.</li>
+  <li><b>סביבת gym פתוחה ומודולרית</b> (sched-rl-gym עצמה) עם עומסים סינתטיים (מודל Lublin), עומסים אמיתיים (קבצי SWF מארכיון העומסים של האונ' העברית), ושני ייצוגי מצב (תמונה מלאה / קומפקטי).</li>
+  <li><b>הערכה אמפירית</b> מול היוריסטיקות (SJF, packer, random, FCFS) ומול גרסת ה-MDP, גם על עומס סינתטי וגם על trace אמיתי (LANL-CM5).</li>
+</ol>
+
+<!-- ===================== CH 4 ===================== -->
+<h2 class="pagebreak">4. יומן עבודה — מה נעשה כדי להריץ ולשחזר (יעד 1)</h2>
+
+<p>זה הפרק שמתעד בדיוק מה נעשה אצלך במחשב, באיזה סדר, ולמה. כל פעולה כאן ניתנת לשחזור עם הפקודות שבפרק 7.</p>
+
+<h3>4.1 זיהוי המאמר והקוד</h3>
+<p>הקישור של גל מוביל ל-ScienceDirect. דרך ה-PII‏ (S0167739X22003090) זוהה ה-DOI‏ 10.1016/j.future.2022.09.025 והכותרת המלאה. המאמר מפנה לריפו <code>renatolfc/sched-rl-gym</code> — שכבר היה משוכפל בתיקיית הפרוייקט, על ענף <code>smdp</code> (הענף שמכיל את מימוש ה-SMDP של המאמר; ענף master מכיל רק את גרסת ה-MDP).</p>
+
+<h3>4.2 סביבת העבודה</h3>
+<p>נמצאה סביבה וירטואלית (venv) קיימת עם Python 3.10 ועם <code>gym==0.21</code> — גרסת ה-gym הישנה שהקוד דורש (זו "ההתיישנות" שגל הזכיר: ה-API של gym השתנה מאז באופן שובר-תאימות, והספרייה הוחלפה ב-gymnasium). הותקנו בנוסף: PyTorch 2.12 (גרסת CPU), tensorboard (ללוגים של האימון) ו-matplotlib (לרינדור).</p>
+
+<h3>4.3 הקושי המרכזי: קומפילציה של מחולל העומסים על Windows</h3>
+<p>החבילה <code>parallelworkloads</code> היא קוד C/C++‎ עטוף ב-Cython שמממש את מודל Lublin99 — מודל סטטיסטי מפורסם שמייצר עומסי עבודה ריאליסטיים (התפלגויות של זמני הגעה, גדלים וזמני ריצה שכוילו מול מערכות אמיתיות). הקוד המקורי נכתב ללינוקס ומשתמש בפונקציות POSIX שלא קיימות בקומפיילר של מיקרוסופט (MSVC):</p>
+<ul>
+  <li><code>drand48()‎</code> / <code>lrand48()‎</code> / <code>srand48()‎</code> — מחולל מספרים אקראיים</li>
+  <li><code>bzero()‎</code> — איפוס זיכרון</li>
+</ul>
+<p>הבנייה נכשלה עם שגיאות <code>error C3861: identifier not found</code>. הפתרון: נכתב קובץ header אחד, <code>rand48_compat.h</code>, שמומש בו המחולל <b>בדיוק לפי מפרט POSIX</b>:</p>
+<pre>
+/* drand48 is a 48-bit Linear Congruential Generator:
+ *   X(n+1) = (a*X(n) + c) mod 2^48,  a = 0x5DEECE66D, c = 0xB
+ * srand48(seed) sets X = (seed &lt;&lt; 16) | 0x330E              */
+static uint64_t _rand48_state = 0x330E;
+
+static void srand48(long seed) {
+    _rand48_state = (((uint64_t)(uint32_t)seed) &lt;&lt; 16) | 0x330E;
+}
+static double drand48(void) {
+    _rand48_state = (0x5DEECE66DULL * _rand48_state + 0xBULL)
+                    &amp; ((1ULL &lt;&lt; 48) - 1);
+    return (double)_rand48_state / (double)(1ULL &lt;&lt; 48);
+}
+</pre>
+<div class="important"><b>למה זה חשוב לשחזור:</b> אילו היינו מחליפים את drand48 ב-<code>rand()‎</code> רגיל של C, הקוד היה מתקמפל — אבל סדרת המספרים האקראיים הייתה שונה, ולכן העומסים שנוצרים היו שונים מאלה של המאמר, וכל השוואה הייתה חסרת משמעות. המימוש לפי המפרט מבטיח שעם אותו seed נקבל בדיוק את אותן משימות כמו בלינוקס. זו נקודה מתודולוגית ששווה להציג לגל: שחזור מדעי דורש זהות ברמת הביטים של מקור האקראיות.</div>
+<p>ה-header הוכלל בשני קבצים: <code>m_lublin99.c</code> (מודל Lublin) ו-<code>est_model.cc</code> (מודל הערכות-המשתמש של Tsafrir). טריק שעוזר כאן: קובץ ה-C מוכלל טקסטואלית לתוך קובץ ה-Cython (<code>cdef extern from "m_lublin99.c"</code>), כך ששניהם יחידת קומפילציה אחת והמימוש הסטטי משרת את שניהם.</p>
+
+<h3>4.4 הרצת חבילת הבדיקות</h3>
+<p>בעיה נוספת: <code>pytest 4.6</code> שמוצמד ב-requirements הוא מ-2019 ולא תואם ל-Python 3.10 (קורס על שינויי AST). שדרוג ל-pytest 7.4 פתר זאת (שינוי בכלי הבדיקה בלבד — לא בקוד הנבדק). התוצאה: <b>97 מתוך 98 בדיקות עוברות</b>. הבדיקה הנכשלת (<code>test_packer_scheduler</code>) עוברת כשמריצים אותה לבד — תלות בסדר ההרצה דרך מצב אקראי גלובלי משותף, באג ידוע בבדיקות עצמן ולא בסימולטור.</p>
+
+<h3>4.5 הורדת הנתונים האמיתיים</h3>
+<p>חלק מהבדיקות (והניסויים במאמר) משתמשים ב-trace אמיתי: <b>LANL-CM5-1994</b> — יומן של 122,060 משימות אמיתיות ממחשב-העל Connection Machine CM-5 בלוס-אלמוס, בפורמט SWF‏ (Standard Workload Format) מארכיון עומסי העבודה המקבילים של האוניברסיטה העברית. ההורדה האוטומטית בקוד נכשלה (בעיית אישורי SSL בסביבת Python מקומית), אז הקובץ הורד ידנית, נפרס מ-gzip, והונח ב-<code>sched-rl-gym/test/</code>. בדיקות הפרסור עליו עוברות.</p>
+
+<h3>4.6 התאמות Windows לסקריפט האימון</h3>
+<p>בקובץ <code>deeprm-agent.py</code> תוקנו שתי בעיות:</p>
+<ol>
+  <li><b>נתיב לינוקסאי:</b> השורה <code>TMPDIR = Path(f'/run/user/{os.getuid()}')</code> משתמשת גם בנתיב שלא קיים ב-Windows וגם בפונקציה <code>os.getuid</code> שלא קיימת בו. הוחלף בבדיקת יכולת: אם אין getuid, משתמשים בתיקיית ה-temp של מערכת ההפעלה. (התיקייה משמשת להעברת חוויות בין תהליכי העבודה המקביליים — ראו פרק 6.)</li>
+  <li><b>תיקיית checkpoints:</b> הסקריפט שומר את משקולות הרשת ל-<code>checkpoint/policy-N.pth</code> אבל לא יוצר את התיקייה — נוספה יצירה אוטומטית.</li>
+</ol>
+
+<h3>4.7 baselines, אימון, ותוצאות עד כה</h3>
+<p>נכתבו שני סקריפטים חדשים בתיקיית הפרוייקט (מחוץ לריפו):</p>
+<ul>
+  <li><code>eval_baselines.py</code> — מריץ את היוריסטיקות SJF ואקראי על הסביבה בלי רינדור גרפי, על פני כמה אפיזודות עם seed קבוע, ומדווח תגמול מצטבר ו-slowdown ממוצע.</li>
+  <li><code>eval_policy.py</code> — טוען checkpoint של רשת מאומנת ומשווה אותה לאותם baselines באותם תנאים.</li>
+</ul>
+<p>תוצאות ה-baselines (10 אפיזודות, seed 42, עומס deeprm ברירת-מחדל):</p>
+<table>
+<tr><th>סוכן</th><th>תגמול מצטבר (ממוצע ± ס"ת)</th><th>slowdown ממוצע</th></tr>
+<tr><td>SJF</td><td class="ltr">−2317 ± 423</td><td class="ltr">20.0 ± 3.7</td></tr>
+<tr><td>Random</td><td class="ltr">−2749 ± 512</td><td class="ltr">23.3 ± 4.3</td></tr>
+</table>
+<p>SJF טוב מאקראי, כצפוי — אימות שפיות של הסימולציה.</p>
+
+<h4>תוצאות האימון המלא (200 epochs, lr=1e-2, ‏4 workers × 50 מסלולים לעדכון)</h4>
+<table>
+<tr><th>סוכן</th><th>תגמול מצטבר</th><th>slowdown ממוצע</th></tr>
+<tr><td>SJF</td><td class="ltr">−2350 ± 408</td><td class="ltr">19.7 ± 3.4</td></tr>
+<tr><td>Random</td><td class="ltr">−2934 ± 580</td><td class="ltr">24.9 ± 4.6</td></tr>
+<tr><td><b>DeepRM — ‏checkpoint מיטבי (epoch 39)</b></td><td class="ltr">−2940 ± 660</td><td class="ltr"><b>22.2 ± 5.2</b></td></tr>
+</table>
+<p>מהלך הלמידה: בתחילת האימון הסוכן גרוע מאקראי (slowdown ‏27.4 ב-epoch 9), משתפר בהתמדה עד שיא ב-epoch 39 (‏22.2 — טוב בבירור מאקראי ומתקרב ל-SJF), ואז <b>מידרדר הדרגתית</b> חזרה ל-24–26. הדפוס "שיפור ואז קריסה" מוכר היטב ב-REINFORCE וונילה: ללא רגולריזציית אנטרופיה המדיניות הופכת דטרמיניסטית מדי ומאבדת את יכולת החקירה, וקצב למידה קבוע וגבוה (1e-2) מערער את ההתכנסות. אלה בדיוק החולשות שאלגוריתמים מודרניים כמו PPO (יעד 2) נועדו לפתור — כלומר התוצאה הזו מספקת מוטיבציה אמפירית מצוינת להמשך הפרוייקט.</p>
+<div class="important"><b>שורה תחתונה ליעד 1:</b> כל הצינור עובד מקצה לקצה — סימולטור, עומסים, סביבה, אימון והערכה — והסוכן אכן לומד (מרמת גרוע-מאקראי לכמעט-SJF). שחזור מלא של עקומות המאמר דורש תקציב אימון גדול יותר ואלגוריתם יציב יותר, שניהם חלק מהתוכנית ממילא.</div>
+
+<!-- ===================== CH 5 ===================== -->
+<h2 class="pagebreak">5. מדריך קוד מלא: sched-rl-gym קובץ-קובץ</h2>
+
+<h3>5.1 מבט-על: שלוש שכבות</h3>
+<p>הריפו בנוי בשלוש שכבות נקיות, וזה המפתח להבנתו:</p>
+<table>
+<tr><th>שכבה</th><th>תפקיד</th><th>קבצים עיקריים</th></tr>
+<tr><td>1. סימולטור ליבה</td><td>מודל של אשכול: משימות, משאבים, אירועים, תורים. לא יודע כלום על RL.</td><td><code>job.py, resource.py, pool.py, cluster.py, event.py, heap.py, scheduler/*</code></td></tr>
+<tr><td>2. עומסי עבודה</td><td>מאיפה מגיעות המשימות: סינתטי פשוט / מודל Lublin / קובץ trace אמיתי</td><td><code>envs/workload.py, workload/*, parallelworkloads</code></td></tr>
+<tr><td>3. סביבת gym</td><td>עוטפת את 1+2 בממשק RL סטנדרטי: state, action, reward, step, reset</td><td><code>envs/base.py, envs/deeprm_env.py, envs/compact_env.py, envs/simulator.py</code></td></tr>
+</table>
+
+<h3>5.2 שכבה 1: המשימה — job.py</h3>
+<p>מחלקת <code>Job</code> מייצגת משימה אחת, עם שדות לפי פורמט SWF: זמן הגשה (<code>submission_time</code>), זמן ריצה אמיתי (<code>execution_time</code>), מעבדים מבוקשים (<code>requested_processors</code>), זמן מבוקש/מוערך (<code>requested_time</code>), זיכרון, סטטוס ועוד. בנוסף שדות שהסימולטור ממלא: <code>start_time, finish_time, slot_position</code>. שתי properties חשובות:</p>
+<pre>
+@property
+def slowdown(self):
+    return (self.finish_time - self.submission_time) / self.execution_time
+
+@property
+def bounded_slowdown(self):
+    return max(1, (self.finish_time - self.submission_time)
+                  / max(10, self.execution_time))
+</pre>
+<p>אלה בדיוק הנוסחאות מפרק 1. <code>JobStatus</code> הוא enum של מצבי החיים: SUBMITTED → SCHEDULED/WAITING → RUNNING → COMPLETED.</p>
+
+<h3>5.3 שכבה 1: משאבים ואשכול — resource.py, pool.py, cluster.py</h3>
+<p>האשכול (<code>Cluster</code>) מחזיק שני pools: מעבדים וזיכרון. כל pool מנוהל באמצעות <b>IntervalTree</b> (עץ אינטרוולים): הקצאה של משאבים למשימה היא אינטרוול [התחלה, סוף) על ציר יחידות המשאב. כך בדיקת "האם משימה נכנסת עכשיו?" (<code>cluster.fits(job)</code>) ובחירת יחידות פנויות הן פעולות מהירות. מחלקת <code>Resource</code> (ב-resource.py) היא רשימת האינטרוולים שהוקצו למשימה מסוימת.</p>
+
+<h3>5.4 שכבה 1: זמן ואירועים — event.py, heap.py</h3>
+<p>הסימולציה מונעת-אירועים: <code>EventQueue</code> מחזיקה אירועי <code>JobEvent</code> (התחלת משימה / סיום משימה) ממוינים בערימה לפי זמן. כשהזמן מתקדם (<code>job_events.step(1)</code>), כל האירועים שהבשילו "משוחקים" על האשכול: משימות שהסתיימו משחררות משאבים ועוברות לתור completed.</p>
+
+<h3>5.5 שכבה 1: המתזמן — scheduler/scheduler.py</h3>
+<p>מחלקת הבסיס <code>Scheduler</code> מנהלת ארבעה תורים שמתארים את מחזור החיים של משימה:</p>
+<ol>
+  <li><b>queue_admission</b> — הוגשו, טרם הוחלט עליהן (זה "התור" שהסוכן רואה)</li>
+  <li><b>queue_waiting</b> — הוחלט לתזמן, טרם התחילו</li>
+  <li><b>queue_running</b> — רצות עכשיו</li>
+  <li><b>queue_completed</b> — הסתיימו (מהן מחושבים המדדים הסופיים)</li>
+</ol>
+<p>היא גם חושפת properties סטטיסטיות: <code>slowdown</code> (רשימת ה-slowdown של כל המשימות שהסתיימו), <code>makespan</code>, <code>utilization</code>, <code>load</code>. תת-המחלקות (fifo, sjf, backfilling...) מממשות רק את לוגיקת הבחירה.</p>
+
+<h4>NullScheduler — הגשר אל ה-RL (scheduler/null_scheduler.py)</h4>
+<p>זו המחלקה המעניינת ביותר בשכבה 1. היא מתזמן ש<b>לא מחליט כלום בעצמו</b> — היא מקבלת פקודות מבחוץ (מהסוכן) ומבצעת אותן על הסימולטור:</p>
+<ul>
+  <li><code>step(offset)</code> — "בחרתי את משימה מספר offset בתור". המתזמן בודק אם היא נכנסת לאשכול <i>עכשיו</i> (<code>cluster.fits</code>); אם כן — מקצה משאבים ומוציא אותה מהתור (מחזיר True), אחרת מתעלם (מחזיר False). מספר שלילי = "לא לעשות כלום".</li>
+  <li><code>forward_time()</code> — מקדם את שעון הסימולציה בצעד אחד ומשחק את האירועים שהבשילו.</li>
+</ul>
+<div class="note">ההפרדה הזו בין "החלטה" ל"קידום זמן" היא שמאפשרת לסוכן לבצע <b>כמה החלטות באותו צעד זמן</b>: כל עוד הפעולה חוקית והצליחה, הסביבה נותנת לסוכן לבחור שוב בלי להזיז את השעון. רק כשהסוכן בוחר "המתן" או פעולה לא חוקית — הזמן זז.</div>
+
+<h3>5.6 שכבה 2: עומסי עבודה — envs/workload.py</h3>
+<p>שלושה מחוללים, נבחרים לפי מילון קונפיגורציה (<code>workload_config['type']</code>):</p>
+<ol>
+  <li><b><code>DeepRmWorkloadGenerator</code> (type='deeprm', ברירת המחדל):</b> המודל הסינתטי הפשוט מהמאמר של DeepRM. בכל צעד זמן מגיעה משימה בהסתברות <code>new_job_rate=0.7</code>; בהסתברות <code>small_job_chance=0.8</code> היא קצרה (1–3 צעדים), אחרת ארוכה (10–15); אחד המשאבים "דומיננטי" (50%–100% מהאשכול) והשני קטן. זה העומס שעליו רץ האימון כרגע.</li>
+  <li><b><code>SyntheticWorkloadGenerator</code> (type='lublin'):</b> עוטף את מודל Lublin99 מהחבילה הקומפלת — עומס ריאליסטי סטטיסטית (זה שהצריך את תיקון ה-drand48). אופציונלית מוסיף הערכות-משתמש שגויות לפי מודל Tsafrir05 או רעש גאוסי — חשוב כי בעולם האמיתי המתזמן לא יודע את זמן הריצה האמיתי, רק את ההערכה.</li>
+  <li><b><code>SwfWorkloadGenerator</code> (type='swf'):</b> מנגן trace אמיתי מקובץ SWF (כמו LANL-CM5 שהורדנו).</li>
+</ol>
+
+<h3 class="pagebreak">5.7 שכבה 3: סביבת ה-gym — envs/base.py ו-envs/deeprm_env.py</h3>
+<p><code>BaseRmEnv</code> היא מחלקת הבסיס שקוראת את כל הקונפיגורציה (kwargs ל-<code>gym.make</code>): גודל האשכול (10 מעבדים, 10 זיכרון), <code>time_horizon=20</code>, ‏<code>job_slots=5</code>, ‏<code>backlog_size=60</code>, ‏<code>time_limit=200</code>, סוג הסימולציה (<code>simulation_type</code>: ‏time_based/event_based — זה מתג ה-MDP/SMDP!), γ, ועל אילו משימות מחושב התגמול (<code>reward_jobs</code>). היא בונה את הרכיבים: מחולל עומס ← NullScheduler ← DeepRmSimulator. פונקציית התגמול:</p>
+<pre>
+def compute_reward(self, joblist):
+    return -np.sum([1 / j.execution_time for j in joblist])
+</pre>
+<p>בדיוק הנוסחה מפרק 3.1 — כל משימה שנמצאת במערכת תורמת ‎−1/T בכל צעד.</p>
+
+<h4>מרחב התצפית של DeepRmEnv</h4>
+<p>שני מצבים, לפי <code>use_raw_state</code>:</p>
+<ul>
+  <li><b>raw (tuple):</b> ‏(תמונת מעבדים 20×10, תמונת זיכרון 20×10, ‏5 תמונות slots למעבדים, 5 לזיכרון, backlog ‏20×3, "זמן מאז משימה אחרונה"). בזה משתמשות ההיוריסטיקות (כמו sjf-agent) כי קל לחלץ מזה מידע.</li>
+  <li><b>image (ברירת מחדל, Box):</b> כל הרכיבים "נארזים" אופקית למטריצה אחת 20×124 (<code>pack_observation</code>) — הקלט לרשת הנוירונים.</li>
+</ul>
+
+<h4>פונקציית step — הלב של הסביבה</h4>
+<p>זרימת <code>DeepRmEnv.step(action)</code>:</p>
+<ol>
+  <li>אם הפעולה היא slot חוקי (0–4) — מתרגמים למיקום בתור (<code>find_slot_position</code>); פעולה 5 = המתן.</li>
+  <li>קוראים ל-<code>simulator.rl_step(action)</code> — שמעביר ל-NullScheduler ואולי מקדם זמן (ראו 5.8). מקבלים בחזרה <code>intermediate</code>: רשימת "צילומי מצב" של המשימות בכל צעד-ביניים שעבר.</li>
+  <li>אם המחולל סיים (אין עוד משימות) נזרק StopIteration ← ‏<code>done=True</code>. בנוסף יש <code>time_limit</code> (ברירת מחדל 200) שעוצר אפיזודות ארוכות.</li>
+  <li>חישוב התגמול: במצב MDP — תגמול בודד על המצב הנוכחי. במצב SMDP — צבירה מנוכה על כל צעדי הביניים:
+  <pre>
+if not done and self.smdp and any(intermediate):
+    rewards = [self.compute_reward(js) for js in intermediate]
+    reward = (self.gamma ** np.arange(len(intermediate))).dot(rewards)
+  </pre>
+  זה בדיוק הסכום <span class="ltr">Σ γ<sup>k</sup>·r<sub>k</sub></span> מנוסחת ה-SMDP בפרק 2.4.</li>
+  <li>מוחזר: (state חדש, reward, done, ובסוף אפיזודה — מילון הסטטיסטיקות).</li>
+</ol>
+
+<h3>5.8 envs/simulator.py — מתג ה-MDP/SMDP</h3>
+<p>כאן ההבדל המהותי בין שני המידולים, ושווה להכיר אותו שורה-שורה:</p>
+<p><b><code>TimeBasedDeepRmSimulator.rl_step</code> (MDP):</b></p>
+<pre>
+if self.scheduler.step(action):   # action succeeded:
+    return [[]]                   #   no time passes, agent acts again
+self.current_time += 1            # otherwise: advance ONE time step
+j = self.workload.step()          # maybe a new job arrives
+if j: self.scheduler.submit(j)
+self.scheduler.forward_time()
+return [listjobs()]               # exactly one intermediate state
+</pre>
+<p><b><code>EventBasedDeepRmSimulator.rl_step</code> (SMDP):</b></p>
+<pre>
+if self.scheduler.step(action):
+    return [[]]
+jobs = []
+while True:                       # advance time in a LOOP...
+    j = self.workload.step()
+    if j: self.scheduler.submit(j)
+    self.scheduler.forward_time()
+    jobs.append(listjobs())       # snapshot per intermediate step
+    if self.scheduler.some_job_fits(self.job_slots):
+        break                     # ...until a real decision point
+return jobs
+</pre>
+<p>כלומר: בגרסת ה-SMDP, אחרי פעולה שלא הצליחה, הסימולטור <b>מריץ את הזמן קדימה לבד</b> עד שמשימה כלשהי מה-slots יכולה להיכנס לאשכול — ורק אז מחזיר שליטה לסוכן, יחד עם צילומי כל צעדי הביניים (שמהם הסביבה מחשבת את התגמול המנוכה המצטבר). הסוכן "מדלג" על כל המצבים חסרי-ההחלטה.</p>
+
+<h3>5.9 רכיבים נוספים בקצרה</h3>
+<ul>
+  <li><b><code>envs/compact_env.py</code></b> — ייצוג מצב חלופי קומפקטי (וקטור תכונות לכל משימה במקום תמונה) — בשימוש בחלק מניסויי המאמר.</li>
+  <li><b><code>envs/render.py</code></b> — ציור מצב הסביבה עם matplotlib (ה-GIF מה-README).</li>
+  <li><b><code>schedgym/test_schedgym.py</code></b> — ‏98 בדיקות יחידה על כל השכבות: יצירת משימות, הקצאת משאבים, נכונות כל מתזמן, פרסור SWF ועוד. הרצתן היא הצעד הראשון אחרי כל שינוי.</li>
+</ul>
+
+<!-- ===================== CH 6 ===================== -->
+<h2 class="pagebreak">6. סקריפט האימון deeprm-agent.py — REINFORCE לעומק</h2>
+
+<h3>6.1 הרשת — PGNet</h3>
+<pre>
+fc1: Linear(20*124 → 512) + ReLU
+fc2: Linear(512 → 256)    + ReLU
+out: Linear(256 → 6)      + Softmax
+</pre>
+<p>הקלט: תמונת המצב משוטחת לוקטור. הפלט: התפלגות הסתברות על 6 הפעולות (5 slots + המתנה). <code>select_action</code> דוגם פעולה מההתפלגות (<code>Categorical(probs).sample()</code>) — דגימה ולא argmax, כי האקראיות הזו היא מנגנון החקירה (exploration) של policy gradient.</p>
+
+<h3>6.2 לולאת האימון — צעד-צעד</h3>
+<ol>
+  <li><b>איסוף ניסיון במקביל:</b> ‏N תהליכי עבודה (workers) נפתחים עם <code>torch.multiprocessing</code>; כל אחד מריץ <code>trajectories_per_batch</code> אפיזודות שלמות עם המדיניות הנוכחית ושומר את המסלולים (state, action, reward לכל צעד) לקובץ pickle בתיקיית temp (זה הקובץ שדרש את תיקון ה-TMPDIR). כל worker מקבל seed שונה (<code>args.seed + rank</code>).</li>
+  <li><b>חישוב תשואות מנוכות:</b> במקום לולאה, טריק וקטורי יפה — <code>make_discount_array</code> בונה מטריצה משולשת D שבה <span class="ltr">D[t,k] = γ<sup>k−t</sup></span> (באמצעות מניפולציית strides של numpy), ואז <span class="ltr">G = D·R</span> נותן את כל ה-G<sub>t</sub> בכפל מטריצות אחד.</li>
+  <li><b>‏baseline ו-advantage:</b> ‏<code>compute_baselines</code> מחשב לכל צעד-זמן t את ממוצע התגמול על פני כל המסלולים באצווה; ‏advantage = תשואה מנוכה פחות baseline (מאופס היכן שהמסלול כבר נגמר).</li>
+  <li><b>צעד הגרדיאנט:</b> ההפסד הוא <span class="ltr">−Σ log π(a<sub>t</sub>|s<sub>t</sub>)·A<sub>t</sub> − β·H(π)</span>, כאשר H הוא רגולריזציית אנטרופיה אופציונלית (<code>--entropy</code>, ברירת מחדל 0) שמעודדת חקירה. אופטימייזר: Adam (ברירת מחדל) או RMSprop, ‏learning rate ‏1e-2.</li>
+  <li><b>ניהול:</b> ‏callback בשם ReduceLROnPlateau מקטין את קצב הלמידה כשההפסד נתקע; כל epoch נשמר checkpoint‏ (<code>checkpoint/policy-N.pth</code>) ונכתבים לוגים ל-TensorBoard (היסטוגרמות משקולות, ממוצעי תגמול/advantage/אורכי אפיזודה).</li>
+</ol>
+
+<h3>6.3 הסקריפטים שלנו</h3>
+<ul>
+  <li><b><code>eval_baselines.py</code></b> — מימוש headless של לוגיקת sjf-agent.py מהריפו: פונקציית <code>sjf_action</code> מחלצת מה-state הגולמי את המשימות שנכנסות לאשכול עכשיו ובוחרת את הקצרה; <code>random_action</code> מגריל פעולה. רץ על כמה אפיזודות ומסכם.</li>
+  <li><b><code>eval_policy.py</code></b> — בונה PGNet זהה, טוען משקולות מ-checkpoint, ומריץ את שלושת הסוכנים (מאומן/SJF/אקראי) באותם תנאים בדיוק (אותו seed) להשוואה הוגנת.</li>
+</ul>
+
+<!-- ===================== CH 7 ===================== -->
+<h2 class="pagebreak">7. איך מריצים הכל — פקודות</h2>
+<p>כל הפקודות מ-PowerShell, מתוך תיקיית הפרוייקט. הסביבה הווירטואלית נמצאת ב-<code>sched-rl-gym\venv</code>.</p>
+
+<h4>בדיקות (אימות הסביבה)</h4>
+<pre>
+cd sched-rl-gym
+venv\Scripts\python.exe -m pytest schedgym\test_schedgym.py -q --no-cov
+</pre>
+
+<h4>בנייה מחדש של מחולל העומסים (אם צריך)</h4>
+<pre>
+venv\Scripts\python.exe -m pip install -e parallelworkloads --no-build-isolation
+</pre>
+
+<h4>הרצת baselines</h4>
+<pre>
+venv\Scripts\python.exe ..\eval_baselines.py --episodes 10
+</pre>
+
+<h4>אימון (מהתיקייה sched-rl-gym)</h4>
+<pre>
+venv\Scripts\python.exe deeprm-agent.py --epochs 200 --workers 4 ^
+    --trajectories-per-batch 50 --max-episode-length 200
+</pre>
+<p class="small">דגלים שימושיים: <span class="ltr">--lr</span> (קצב למידה), <span class="ltr">--entropy</span> (רגולריזציה), <span class="ltr">--load PATH</span> (המשך מ-checkpoint), <span class="ltr">--workload FILE.json</span> (קונפיגורציית עומס אחרת, למשל lublin או swf).</p>
+
+<h4>הערכת מדיניות מאומנת</h4>
+<pre>
+venv\Scripts\python.exe ..\eval_policy.py checkpoint\policy-199.pth --episodes 20
+</pre>
+
+<h4>מעקב אחרי האימון עם TensorBoard</h4>
+<pre>
+venv\Scripts\python.exe -m tensorboard.main --logdir runs
+</pre>
+
+<h4>מעבר בין MDP ל-SMDP</h4>
+<p>דרך kwargs של הסביבה — למשל בקובץ workload/קונפיגורציה או בקוד:</p>
+<pre>
+env = gym.make('DeepRM-v0', simulation_type='event_based', gamma=0.99)  # SMDP
+env = gym.make('DeepRM-v0', simulation_type='time_based')               # MDP
+</pre>
+
+<!-- ===================== CH 8 ===================== -->
+<h2>8. תוצאות, מסקנות ביניים, וצעדים הבאים</h2>
+
+<h3>8.1 מצב יעד 1</h3>
+<table>
+<tr><th>רכיב</th><th>סטטוס</th></tr>
+<tr><td>קומפילציה והתקנה של כל הקוד על Windows</td><td>הושלם</td></tr>
+<tr><td>חבילת בדיקות</td><td>97/98 עוברות (הנכשלת — באג סדר-הרצה בבדיקה עצמה)</td></tr>
+<tr><td>נתונים: trace אמיתי LANL-CM5 (122,060 משימות)</td><td>הורד ועובר פרסור</td></tr>
+<tr><td>baselines (SJF, Random)</td><td>רצים; SJF&nbsp;19.7 מול Random&nbsp;24.9 slowdown ממוצע</td></tr>
+<tr><td>אימון REINFORCE‏ (200 epochs)</td><td>הושלם; שיא ב-epoch 39: ‏slowdown ‏22.2 — בין SJF לאקראי</td></tr>
+<tr><td>שחזור מלא של גרפי המאמר (MDP מול SMDP)</td><td>השלב הבא — דורש אימון ארוך יותר / PPO‏ (יעד 2)</td></tr>
+</table>
+
+<h3>8.2 שאלות פתוחות לפגישה עם גל</h3>
+<ul>
+  <li>כמה מהקונפיגורציות במאמר לשחזר (עומס deeprm / lublin / trace אמיתי)? אימון על CPU איטי — האם יש גישה ל-GPU?</li>
+  <li>אסטרטגיית המיגרציה: לשדרג את הסביבה ל-gymnasium (ה-API החדש) לפני יעד 2, או לעטוף באדפטר?</li>
+  <li>ביעד 2 — אילו אלגוריתמים? מועמדים טבעיים: PPO ו-A2C מ-stable-baselines3 (בריפו יש כבר מחברת PPO אבל עם stable-baselines הישן על TensorFlow 1 — לא שמיש כיום), ואולי DQN עם action masking (הסביבה כבר חושפת <code>action_masks()</code>).</li>
+</ul>
+
+<h3>8.3 התוכנית ליעדים 2–3</h3>
+<ol>
+  <li><b>מיגרציה ל-gymnasium:</b> שינויי API נקודתיים: ‏reset מחזיר (obs, info)‏; step מחזיר 5 ערכים (terminated/truncated במקום done); רישום סביבות. זה גם "מודרניזציה" שגל ביקש לחשוב עליה.</li>
+  <li><b>אינטגרציה עם stable-baselines3:</b> אימון PPO על שתי הגרסאות (MDP ו-SMDP) והשוואה ל-REINFORCE ולהיוריסטיקות, על אותם מדדים (slowdown, bounded slowdown, utilization).</li>
+  <li><b>יעד 3 — כיוונים אפשריים לאלגוריתם חדש:</b> שילוב action masking עם SMDP; ‏reward shaping מבוסס bounded slowdown; ‏curriculum על עומס גובר; או טרנספורמר/attention על תור המשימות במקום ייצוג תמונה. ייבחר עם גל בהמשך.</li>
+</ol>
+
+<!-- ===================== CH 9 ===================== -->
+<h2 class="pagebreak">9. נספח: מילון מונחים</h2>
+<table>
+<tr><th>מונח</th><th>הסבר</th></tr>
+<tr><td>HPC</td><td>High-Performance Computing — מחשוב-על: אשכולות גדולים למשימות חישוביות כבדות</td></tr>
+<tr><td>Job</td><td>משימה: בקשת חישוב עם דרישת מעבדים, זיכרון ומשך</td></tr>
+<tr><td>Slowdown</td><td>(זמן המתנה + ריצה) / זמן ריצה — מדד עיכוב יחסי</td></tr>
+<tr><td>Makespan</td><td>הזמן עד שהמשימה האחרונה מסתיימת</td></tr>
+<tr><td>Utilization</td><td>אחוז המעבדים בשימוש בפועל</td></tr>
+<tr><td>SWF</td><td>Standard Workload Format — פורמט סטנדרטי ליומני עומס של מערכות אמיתיות</td></tr>
+<tr><td>Trace</td><td>יומן משימות אמיתי שהוקלט ממערכת חיה (כמו LANL-CM5)</td></tr>
+<tr><td>מודל Lublin</td><td>מודל סטטיסטי (1999) שמייצר עומסים סינתטיים ריאליסטיים</td></tr>
+<tr><td>MDP</td><td>תהליך החלטה מרקובי — הפורמליזם הבסיסי של RL</td></tr>
+<tr><td>SMDP</td><td>Semi-MDP — הכללה שבה פעולות נמשכות זמן משתנה; הסוכן מחליט רק בנקודות החלטה</td></tr>
+<tr><td>Policy ‏π(a|s)</td><td>המדיניות: התפלגות הפעולות בכל מצב — מה שהרשת לומדת</td></tr>
+<tr><td>Return ‏G</td><td>סכום תגמולים מנוכה מנקודת זמן ואילך</td></tr>
+<tr><td>REINFORCE</td><td>אלגוריתם policy gradient בסיסי: חיזוק פעולות לפי התשואה שאחריהן</td></tr>
+<tr><td>Baseline / Advantage</td><td>ערך ייחוס שמוחסר מהתשואה להקטנת שונות; ההפרש נקרא advantage</td></tr>
+<tr><td>Entropy regularization</td><td>תוספת להפסד שמעודדת התפלגות פעולות "מפוזרת" — שומרת על חקירה</td></tr>
+<tr><td>Epoch / Trajectory</td><td>סבב עדכון אחד של הרשת / אפיזודה אחת מלאה של אינטראקציה</td></tr>
+<tr><td>Checkpoint</td><td>שמירת משקולות הרשת לקובץ באמצע אימון</td></tr>
+<tr><td>gym / gymnasium</td><td>ממשק סטנדרטי לסביבות RL‏; gymnasium הוא היורש המודרני של gym</td></tr>
+<tr><td>IntervalTree</td><td>מבנה נתונים לחיפוש מהיר של חפיפות אינטרוולים — מנהל את הקצאות המשאבים</td></tr>
+<tr><td>drand48</td><td>מחולל מספרים אקראיים של POSIX‏ (LCG ‏48-ביט) — מקור האקראיות של מודל Lublin</td></tr>
+</table>
+
+<p class="small" style="margin-top:30px; border-top: 1px solid #ccc; padding-top: 8px;">
+נוצר ביוני 2026 כחלק מתיעוד פרוייקט הגמר. קבצים נלווים: PROGRESS.md (דוח התקדמות תמציתי), eval_baselines.py, eval_policy.py.
+</p>
+
+</body>
+</html>

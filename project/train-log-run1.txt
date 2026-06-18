@@ -1,0 +1,180 @@
+﻿Current epoch: 0
+Loss for worker 0 on epoch 0: 34159925.08638554
+Loss for epoch 0: 34159925.08638554�0.0
+Current epoch: 1
+Loss for worker 0 on epoch 1: 14139177.822916137
+Loss for epoch 1: 14139177.822916137�0.0
+Current epoch: 2
+Loss for worker 0 on epoch 2: 12763323.173913524
+Loss for epoch 2: 12763323.173913524�0.0
+Current epoch: 3
+Loss for worker 0 on epoch 3: 7685643.549038381
+Loss for epoch 3: 7685643.549038381�0.0
+Current epoch: 4
+Loss for worker 0 on epoch 4: 15163647.759294312
+Loss for epoch 4: 15163647.759294312�0.0
+Current epoch: 5
+Loss for worker 0 on epoch 5: 8266243.681245972
+Loss for epoch 5: 8266243.681245972�0.0
+Current epoch: 6
+Loss for worker 0 on epoch 6: 10018334.0781078
+Loss for epoch 6: 10018334.0781078�0.0
+Current epoch: 7
+Loss for worker 0 on epoch 7: 9831350.830279468
+Loss for epoch 7: 9831350.830279468�0.0
+Current epoch: 8
+Loss for worker 0 on epoch 8: 10237413.477701139
+Loss for epoch 8: 10237413.477701139�0.0
+Current epoch: 9
+Loss for worker 0 on epoch 9: 7919959.704676188
+Loss for epoch 9: 7919959.704676188�0.0
+Current epoch: 10
+Loss for worker 0 on epoch 10: 5140614.225931655
+Loss for epoch 10: 5140614.225931655�0.0
+Current epoch: 11
+Loss for worker 0 on epoch 11: 18536942.659226425
+Loss for epoch 11: 18536942.659226425�0.0
+Current epoch: 12
+Loss for worker 0 on epoch 12: 5555204.252694853
+Loss for epoch 12: 5555204.252694853�0.0
+Current epoch: 13
+Loss for worker 0 on epoch 13: 3894037.892005254
+Loss for epoch 13: 3894037.892005254�0.0
+Current epoch: 14
+Loss for worker 0 on epoch 14: 4632938.141524112
+Loss for epoch 14: 4632938.141524112�0.0
+Current epoch: 15
+Loss for worker 0 on epoch 15: 3593477.8403821858
+Loss for epoch 15: 3593477.8403821858�0.0
+Current epoch: 16
+Loss for worker 0 on epoch 16: 3925839.9854801195
+Loss for epoch 16: 3925839.9854801195�0.0
+Current epoch: 17
+Loss for worker 0 on epoch 17: 4122536.5999161582
+Loss for epoch 17: 4122536.5999161582�0.0
+Current epoch: 18
+Loss for worker 0 on epoch 18: 4841027.4125748705
+Loss for epoch 18: 4841027.4125748705�0.0
+Current epoch: 19
+Loss for worker 0 on epoch 19: 3534470.839482935
+Loss for epoch 19: 3534470.839482935�0.0
+Current epoch: 20
+Loss for worker 0 on epoch 20: 3280656.533484936
+Loss for epoch 20: 3280656.533484936�0.0
+Current epoch: 21
+Loss for worker 0 on epoch 21: 2507082.594164208
+Loss for epoch 21: 2507082.594164208�0.0
+Current epoch: 22
+Loss for worker 0 on epoch 22: 2758488.2869586786
+Loss for epoch 22: 2758488.2869586786�0.0
+Current epoch: 23
+Loss for worker 0 on epoch 23: 2658225.405408405
+Loss for epoch 23: 2658225.405408405�0.0
+Current epoch: 24
+Loss for worker 0 on epoch 24: 2619491.0719864434
+Loss for epoch 24: 2619491.0719864434�0.0
+Current epoch: 25
+Loss for worker 0 on epoch 25: 2241539.969640738
+Loss for epoch 25: 2241539.969640738�0.0
+Current epoch: 26
+Loss for worker 0 on epoch 26: 2261717.021721854
+Loss for epoch 26: 2261717.021721854�0.0
+Current epoch: 27
+Loss for worker 0 on epoch 27: 2143990.7349872976
+Loss for epoch 27: 2143990.7349872976�0.0
+Current epoch: 28
+Loss for worker 0 on epoch 28: 2359056.233709419
+Loss for epoch 28: 2359056.233709419�0.0
+Current epoch: 29
+Loss for worker 0 on epoch 29: 2330668.6743092146
+Loss for epoch 29: 2330668.6743092146�0.0
+Current epoch: 30
+Loss for worker 0 on epoch 30: 2789505.8825780055
+Loss for epoch 30: 2789505.8825780055�0.0
+Current epoch: 31
+Loss for worker 0 on epoch 31: 2944904.5081239473
+Loss for epoch 31: 2944904.5081239473�0.0
+Current epoch: 32
+Loss for worker 0 on epoch 32: 2480599.045876096
+Loss for epoch 32: 2480599.045876096�0.0
+Current epoch: 33
+Loss for worker 0 on epoch 33: 2815527.7823578534
+Loss for epoch 33: 2815527.7823578534�0.0
+Current epoch: 34
+Loss for worker 0 on epoch 34: 2501532.8168115346
+Loss for epoch 34: 2501532.8168115346�0.0
+Current epoch: 35
+Loss for worker 0 on epoch 35: 2672032.656959025
+Loss for epoch 35: 2672032.656959025�0.0
+Current epoch: 36
+Loss for worker 0 on epoch 36: 3081488.675469052
+Loss for epoch 36: 3081488.675469052�0.0
+Current epoch: 37
+Loss for worker 0 on epoch 37: 2581892.19497104
+Loss for epoch 37: 2581892.19497104�0.0
+Current epoch: 38
+Loss for worker 0 on epoch 38: 3028464.4716028785
+Loss for epoch 38: 3028464.4716028785�0.0
+Current epoch: 39
+Loss for worker 0 on epoch 39: 3460665.3067189953
+Loss for epoch 39: 3460665.3067189953�0.0
+Current epoch: 40
+Loss for worker 0 on epoch 40: 2338251.1810839623
+Loss for epoch 40: 2338251.1810839623�0.0
+Current epoch: 41
+Loss for worker 0 on epoch 41: 2311074.894660014
+Loss for epoch 41: 2311074.894660014�0.0
+Current epoch: 42
+Loss for worker 0 on epoch 42: 2933064.775126502
+Loss for epoch 42: 2933064.775126502�0.0
+Current epoch: 43
+Loss for worker 0 on epoch 43: 2646916.097538741
+Loss for epoch 43: 2646916.097538741�0.0
+Current epoch: 44
+Loss for worker 0 on epoch 44: 3091086.7446680693
+Loss for epoch 44: 3091086.7446680693�0.0
+Current epoch: 45
+Loss for worker 0 on epoch 45: 2424053.8827243648
+Loss for epoch 45: 2424053.8827243648�0.0
+Current epoch: 46
+Loss for worker 0 on epoch 46: 3339711.329077624
+Loss for epoch 46: 3339711.329077624�0.0
+Current epoch: 47
+Loss for worker 0 on epoch 47: 3391662.0030823397
+Loss for epoch 47: 3391662.0030823397�0.0
+Current epoch: 48
+Loss for worker 0 on epoch 48: 3648536.958872185
+Loss for epoch 48: 3648536.958872185�0.0
+Current epoch: 49
+Loss for worker 0 on epoch 49: 5242227.324198984
+Loss for epoch 49: 5242227.324198984�0.0
+Current epoch: 50
+Loss for worker 0 on epoch 50: 2743330.4122460666
+Loss for epoch 50: 2743330.4122460666�0.0
+Current epoch: 51
+Loss for worker 0 on epoch 51: 3238339.2495140377
+Loss for epoch 51: 3238339.2495140377�0.0
+Current epoch: 52
+Loss for worker 0 on epoch 52: 13939896.266463874
+Loss for epoch 52: 13939896.266463874�0.0
+Current epoch: 53
+Loss for worker 0 on epoch 53: 3264492.143103887
+Loss for epoch 53: 3264492.143103887�0.0
+Current epoch: 54
+Loss for worker 0 on epoch 54: 2674807.1119203893
+Loss for epoch 54: 2674807.1119203893�0.0
+Current epoch: 55
+Loss for worker 0 on epoch 55: 2413536.76971427
+Loss for epoch 55: 2413536.76971427�0.0
+Current epoch: 56
+Loss for worker 0 on epoch 56: 2510922.7054844894
+Loss for epoch 56: 2510922.7054844894�0.0
+Current epoch: 57
+Loss for worker 0 on epoch 57: 2435908.847141968
+Loss for epoch 57: 2435908.847141968�0.0
+Current epoch: 58
+Loss for worker 0 on epoch 58: 2386396.5690892055
+Loss for epoch 58: 2386396.5690892055�0.0
+Current epoch: 59
+Loss for worker 0 on epoch 59: 2277024.008731192
+Loss for epoch 59: 2277024.008731192�0.0

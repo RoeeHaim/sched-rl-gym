@@ -1,0 +1,600 @@
+Current epoch: 0
+Loss for worker 0 on epoch 0: 66907468.24713632
+Loss for epoch 0: 66907468.24713632±0.0
+Current epoch: 1
+Loss for worker 0 on epoch 1: 5385566.811380186
+Loss for epoch 1: 5385566.811380186±0.0
+Current epoch: 2
+Loss for worker 0 on epoch 2: 1825421.0476558963
+Loss for epoch 2: 1825421.0476558963±0.0
+Current epoch: 3
+Loss for worker 0 on epoch 3: 11670940.001788596
+Loss for epoch 3: 11670940.001788596±0.0
+Current epoch: 4
+Loss for worker 0 on epoch 4: 2874753.3809436047
+Loss for epoch 4: 2874753.3809436047±0.0
+Current epoch: 5
+Loss for worker 0 on epoch 5: 2333755.816316403
+Loss for epoch 5: 2333755.816316403±0.0
+Current epoch: 6
+Loss for worker 0 on epoch 6: 878405.253538054
+Loss for epoch 6: 878405.253538054±0.0
+Current epoch: 7
+Loss for worker 0 on epoch 7: 1448436.9268737906
+Loss for epoch 7: 1448436.9268737906±0.0
+Current epoch: 8
+Loss for worker 0 on epoch 8: 6417101.11356548
+Loss for epoch 8: 6417101.11356548±0.0
+Current epoch: 9
+Loss for worker 0 on epoch 9: 2931803.480535546
+Loss for epoch 9: 2931803.480535546±0.0
+Current epoch: 10
+Loss for worker 0 on epoch 10: 1970346.8384479212
+Loss for epoch 10: 1970346.8384479212±0.0
+Current epoch: 11
+Loss for worker 0 on epoch 11: 933273.3794694426
+Loss for epoch 11: 933273.3794694426±0.0
+Current epoch: 12
+Loss for worker 0 on epoch 12: 1303285.3465438997
+Loss for epoch 12: 1303285.3465438997±0.0
+Current epoch: 13
+Loss for worker 0 on epoch 13: 2923128.319019567
+Loss for epoch 13: 2923128.319019567±0.0
+Current epoch: 14
+Loss for worker 0 on epoch 14: 1666483.147181581
+Loss for epoch 14: 1666483.147181581±0.0
+Current epoch: 15
+Loss for worker 0 on epoch 15: 691515.4891799898
+Loss for epoch 15: 691515.4891799898±0.0
+Current epoch: 16
+Loss for worker 0 on epoch 16: 999176.4440285871
+Loss for epoch 16: 999176.4440285871±0.0
+Current epoch: 17
+Loss for worker 0 on epoch 17: 1493781.4586715212
+Loss for epoch 17: 1493781.4586715212±0.0
+Current epoch: 18
+Loss for worker 0 on epoch 18: 1421403.88470136
+Loss for epoch 18: 1421403.88470136±0.0
+Current epoch: 19
+Loss for worker 0 on epoch 19: 453739.2745133422
+Loss for epoch 19: 453739.2745133422±0.0
+Current epoch: 20
+Loss for worker 0 on epoch 20: 449971.9685022584
+Loss for epoch 20: 449971.9685022584±0.0
+Current epoch: 21
+Loss for worker 0 on epoch 21: 327450.5690790034
+Loss for epoch 21: 327450.5690790034±0.0
+Current epoch: 22
+Loss for worker 0 on epoch 22: 735292.3321065133
+Loss for epoch 22: 735292.3321065133±0.0
+Current epoch: 23
+Loss for worker 0 on epoch 23: 2061560.1289266823
+Loss for epoch 23: 2061560.1289266823±0.0
+Current epoch: 24
+Loss for worker 0 on epoch 24: 687166.6169735772
+Loss for epoch 24: 687166.6169735772±0.0
+Current epoch: 25
+Loss for worker 0 on epoch 25: 1216870.7045440276
+Loss for epoch 25: 1216870.7045440276±0.0
+Current epoch: 26
+Loss for worker 0 on epoch 26: 432894.8647954815
+Loss for epoch 26: 432894.8647954815±0.0
+Current epoch: 27
+Loss for worker 0 on epoch 27: 331891.2819204298
+Loss for epoch 27: 331891.2819204298±0.0
+Current epoch: 28
+Loss for worker 0 on epoch 28: 244124.95158048472
+Loss for epoch 28: 244124.95158048472±0.0
+Current epoch: 29
+Loss for worker 0 on epoch 29: 1919937.517101722
+Loss for epoch 29: 1919937.517101722±0.0
+Current epoch: 30
+Loss for worker 0 on epoch 30: 501895.5492799247
+Loss for epoch 30: 501895.5492799247±0.0
+Current epoch: 31
+Loss for worker 0 on epoch 31: 281448.77197200333
+Loss for epoch 31: 281448.77197200333±0.0
+Current epoch: 32
+Loss for worker 0 on epoch 32: 208356.77300742263
+Loss for epoch 32: 208356.77300742263±0.0
+Current epoch: 33
+Loss for worker 0 on epoch 33: 416450.116022564
+Loss for epoch 33: 416450.116022564±0.0
+Current epoch: 34
+Loss for worker 0 on epoch 34: 373464.3147281507
+Loss for epoch 34: 373464.3147281507±0.0
+Current epoch: 35
+Loss for worker 0 on epoch 35: 531369.4496534291
+Loss for epoch 35: 531369.4496534291±0.0
+Current epoch: 36
+Loss for worker 0 on epoch 36: 801974.5473688897
+Loss for epoch 36: 801974.5473688897±0.0
+Current epoch: 37
+Loss for worker 0 on epoch 37: 415202.5795609419
+Loss for epoch 37: 415202.5795609419±0.0
+Current epoch: 38
+Loss for worker 0 on epoch 38: 391605.7575695874
+Loss for epoch 38: 391605.7575695874±0.0
+Current epoch: 39
+Loss for worker 0 on epoch 39: 620206.5458179344
+Loss for epoch 39: 620206.5458179344±0.0
+Current epoch: 40
+Loss for worker 0 on epoch 40: 831969.0665374881
+Loss for epoch 40: 831969.0665374881±0.0
+Current epoch: 41
+Loss for worker 0 on epoch 41: 612819.6324825744
+Loss for epoch 41: 612819.6324825744±0.0
+Current epoch: 42
+Loss for worker 0 on epoch 42: 373160.1399115601
+Loss for epoch 42: 373160.1399115601±0.0
+Current epoch: 43
+Loss for worker 0 on epoch 43: 332128.9242396919
+Loss for epoch 43: 332128.9242396919±0.0
+Current epoch: 44
+Loss for worker 0 on epoch 44: 473540.09461901145
+Loss for epoch 44: 473540.09461901145±0.0
+Current epoch: 45
+Loss for worker 0 on epoch 45: 424078.92232038314
+Loss for epoch 45: 424078.92232038314±0.0
+Current epoch: 46
+Loss for worker 0 on epoch 46: 647542.9121976441
+Loss for epoch 46: 647542.9121976441±0.0
+Current epoch: 47
+Loss for worker 0 on epoch 47: 719808.5836074476
+Loss for epoch 47: 719808.5836074476±0.0
+Current epoch: 48
+Loss for worker 0 on epoch 48: 849838.4184345051
+Loss for epoch 48: 849838.4184345051±0.0
+Current epoch: 49
+Loss for worker 0 on epoch 49: 1013343.4181048147
+Loss for epoch 49: 1013343.4181048147±0.0
+Current epoch: 50
+Loss for worker 0 on epoch 50: 598370.5425127842
+Loss for epoch 50: 598370.5425127842±0.0
+Current epoch: 51
+Loss for worker 0 on epoch 51: 440002.9691153299
+Loss for epoch 51: 440002.9691153299±0.0
+Current epoch: 52
+Loss for worker 0 on epoch 52: 373193.500907375
+Loss for epoch 52: 373193.500907375±0.0
+Current epoch: 53
+Loss for worker 0 on epoch 53: 366189.223584262
+Loss for epoch 53: 366189.223584262±0.0
+Current epoch: 54
+Loss for worker 0 on epoch 54: 380452.7486332142
+Loss for epoch 54: 380452.7486332142±0.0
+Current epoch: 55
+Loss for worker 0 on epoch 55: 221176.350884159
+Loss for epoch 55: 221176.350884159±0.0
+Current epoch: 56
+Loss for worker 0 on epoch 56: 295761.43026357243
+Loss for epoch 56: 295761.43026357243±0.0
+Current epoch: 57
+Loss for worker 0 on epoch 57: 423344.6599617944
+Loss for epoch 57: 423344.6599617944±0.0
+Current epoch: 58
+Loss for worker 0 on epoch 58: 486428.3354396448
+Loss for epoch 58: 486428.3354396448±0.0
+Current epoch: 59
+Loss for worker 0 on epoch 59: 377448.0380380431
+Loss for epoch 59: 377448.0380380431±0.0
+Current epoch: 60
+Loss for worker 0 on epoch 60: 421918.97724228684
+Loss for epoch 60: 421918.97724228684±0.0
+Current epoch: 61
+Loss for worker 0 on epoch 61: 531762.6442315573
+Loss for epoch 61: 531762.6442315573±0.0
+Current epoch: 62
+Loss for worker 0 on epoch 62: 447175.4397080337
+Loss for epoch 62: 447175.4397080337±0.0
+Current epoch: 63
+Loss for worker 0 on epoch 63: 299954.1569607694
+Loss for epoch 63: 299954.1569607694±0.0
+Current epoch: 64
+Loss for worker 0 on epoch 64: 255177.04601731114
+Loss for epoch 64: 255177.04601731114±0.0
+Current epoch: 65
+Loss for worker 0 on epoch 65: 201340.91522735386
+Loss for epoch 65: 201340.91522735386±0.0
+Current epoch: 66
+Loss for worker 0 on epoch 66: 224161.74576441053
+Loss for epoch 66: 224161.74576441053±0.0
+Current epoch: 67
+Loss for worker 0 on epoch 67: 313983.9041717626
+Loss for epoch 67: 313983.9041717626±0.0
+Current epoch: 68
+Loss for worker 0 on epoch 68: 233873.37401907754
+Loss for epoch 68: 233873.37401907754±0.0
+Current epoch: 69
+Loss for worker 0 on epoch 69: 328801.6863039929
+Loss for epoch 69: 328801.6863039929±0.0
+Current epoch: 70
+Loss for worker 0 on epoch 70: 274486.12791127805
+Loss for epoch 70: 274486.12791127805±0.0
+Current epoch: 71
+Loss for worker 0 on epoch 71: 339998.02815745684
+Loss for epoch 71: 339998.02815745684±0.0
+Current epoch: 72
+Loss for worker 0 on epoch 72: 288489.5492978803
+Loss for epoch 72: 288489.5492978803±0.0
+Current epoch: 73
+Loss for worker 0 on epoch 73: 266577.5728157089
+Loss for epoch 73: 266577.5728157089±0.0
+Current epoch: 74
+Loss for worker 0 on epoch 74: 175207.36742832602
+Loss for epoch 74: 175207.36742832602±0.0
+Current epoch: 75
+Loss for worker 0 on epoch 75: 233261.10227284874
+Loss for epoch 75: 233261.10227284874±0.0
+Current epoch: 76
+Loss for worker 0 on epoch 76: 95848.2629347258
+Loss for epoch 76: 95848.2629347258±0.0
+Current epoch: 77
+Loss for worker 0 on epoch 77: 142736.84538612448
+Loss for epoch 77: 142736.84538612448±0.0
+Current epoch: 78
+Loss for worker 0 on epoch 78: 276995.0778078514
+Loss for epoch 78: 276995.0778078514±0.0
+Current epoch: 79
+Loss for worker 0 on epoch 79: 105927.80410712381
+Loss for epoch 79: 105927.80410712381±0.0
+Current epoch: 80
+Loss for worker 0 on epoch 80: 248032.8766367343
+Loss for epoch 80: 248032.8766367343±0.0
+Current epoch: 81
+Loss for worker 0 on epoch 81: 289460.4081715235
+Loss for epoch 81: 289460.4081715235±0.0
+Current epoch: 82
+Loss for worker 0 on epoch 82: 184688.1955901638
+Loss for epoch 82: 184688.1955901638±0.0
+Current epoch: 83
+Loss for worker 0 on epoch 83: 126833.97346749269
+Loss for epoch 83: 126833.97346749269±0.0
+Current epoch: 84
+Loss for worker 0 on epoch 84: 261652.31358115643
+Loss for epoch 84: 261652.31358115643±0.0
+Current epoch: 85
+Loss for worker 0 on epoch 85: 360922.1686128511
+Loss for epoch 85: 360922.1686128511±0.0
+Current epoch: 86
+Loss for worker 0 on epoch 86: 246116.38543131354
+Loss for epoch 86: 246116.38543131354±0.0
+Current epoch: 87
+Loss for worker 0 on epoch 87: 370283.6485627537
+Loss for epoch 87: 370283.6485627537±0.0
+Current epoch: 88
+Loss for worker 0 on epoch 88: 307985.71313345345
+Loss for epoch 88: 307985.71313345345±0.0
+Current epoch: 89
+Loss for worker 0 on epoch 89: 263659.35916756466
+Loss for epoch 89: 263659.35916756466±0.0
+Current epoch: 90
+Loss for worker 0 on epoch 90: 438957.3434823782
+Loss for epoch 90: 438957.3434823782±0.0
+Current epoch: 91
+Loss for worker 0 on epoch 91: 352661.10930854286
+Loss for epoch 91: 352661.10930854286±0.0
+Current epoch: 92
+Loss for worker 0 on epoch 92: 126795.5491911256
+Loss for epoch 92: 126795.5491911256±0.0
+Current epoch: 93
+Loss for worker 0 on epoch 93: 265710.257998717
+Loss for epoch 93: 265710.257998717±0.0
+Current epoch: 94
+Loss for worker 0 on epoch 94: 859171.9429719584
+Loss for epoch 94: 859171.9429719584±0.0
+Current epoch: 95
+Loss for worker 0 on epoch 95: 192830.62192370766
+Loss for epoch 95: 192830.62192370766±0.0
+Current epoch: 96
+Loss for worker 0 on epoch 96: 277712.7616285631
+Loss for epoch 96: 277712.7616285631±0.0
+Current epoch: 97
+Loss for worker 0 on epoch 97: 128174.77217331498
+Loss for epoch 97: 128174.77217331498±0.0
+Current epoch: 98
+Loss for worker 0 on epoch 98: 232054.29318612092
+Loss for epoch 98: 232054.29318612092±0.0
+Current epoch: 99
+Loss for worker 0 on epoch 99: 175414.66534957496
+Loss for epoch 99: 175414.66534957496±0.0
+Current epoch: 100
+Loss for worker 0 on epoch 100: 255031.52037115349
+Loss for epoch 100: 255031.52037115349±0.0
+Current epoch: 101
+Loss for worker 0 on epoch 101: 273988.97849778295
+Loss for epoch 101: 273988.97849778295±0.0
+Current epoch: 102
+Loss for worker 0 on epoch 102: 270095.6466693627
+Loss for epoch 102: 270095.6466693627±0.0
+Current epoch: 103
+Loss for worker 0 on epoch 103: 425581.1573108624
+Loss for epoch 103: 425581.1573108624±0.0
+Current epoch: 104
+Loss for worker 0 on epoch 104: 370152.7930799527
+Loss for epoch 104: 370152.7930799527±0.0
+Current epoch: 105
+Loss for worker 0 on epoch 105: 267509.9532735179
+Loss for epoch 105: 267509.9532735179±0.0
+Current epoch: 106
+Loss for worker 0 on epoch 106: 212636.97094446144
+Loss for epoch 106: 212636.97094446144±0.0
+Current epoch: 107
+Loss for worker 0 on epoch 107: 223169.80800911365
+Loss for epoch 107: 223169.80800911365±0.0
+Current epoch: 108
+Loss for worker 0 on epoch 108: 208360.698298176
+Loss for epoch 108: 208360.698298176±0.0
+Current epoch: 109
+Loss for worker 0 on epoch 109: 243274.79375439227
+Loss for epoch 109: 243274.79375439227±0.0
+Current epoch: 110
+Loss for worker 0 on epoch 110: 301862.0671752952
+Loss for epoch 110: 301862.0671752952±0.0
+Current epoch: 111
+Loss for worker 0 on epoch 111: 309019.57599724963
+Loss for epoch 111: 309019.57599724963±0.0
+Current epoch: 112
+Loss for worker 0 on epoch 112: 184805.46494476497
+Loss for epoch 112: 184805.46494476497±0.0
+Current epoch: 113
+Loss for worker 0 on epoch 113: 395401.2307871747
+Loss for epoch 113: 395401.2307871747±0.0
+Current epoch: 114
+Loss for worker 0 on epoch 114: 344131.8617060131
+Loss for epoch 114: 344131.8617060131±0.0
+Current epoch: 115
+Loss for worker 0 on epoch 115: 428117.5069722239
+Loss for epoch 115: 428117.5069722239±0.0
+Current epoch: 116
+Loss for worker 0 on epoch 116: 423222.04837560904
+Loss for epoch 116: 423222.04837560904±0.0
+Current epoch: 117
+Loss for worker 0 on epoch 117: 242413.922872003
+Loss for epoch 117: 242413.922872003±0.0
+Current epoch: 118
+Loss for worker 0 on epoch 118: 302025.7381353602
+Loss for epoch 118: 302025.7381353602±0.0
+Current epoch: 119
+Loss for worker 0 on epoch 119: 297104.9226228312
+Loss for epoch 119: 297104.9226228312±0.0
+Current epoch: 120
+Loss for worker 0 on epoch 120: 185496.31497452213
+Loss for epoch 120: 185496.31497452213±0.0
+Current epoch: 121
+Loss for worker 0 on epoch 121: 200678.4041400922
+Loss for epoch 121: 200678.4041400922±0.0
+Current epoch: 122
+Loss for worker 0 on epoch 122: 267715.6830374435
+Loss for epoch 122: 267715.6830374435±0.0
+Current epoch: 123
+Loss for worker 0 on epoch 123: 275629.0463168534
+Loss for epoch 123: 275629.0463168534±0.0
+Current epoch: 124
+Loss for worker 0 on epoch 124: 301554.05310127814
+Loss for epoch 124: 301554.05310127814±0.0
+Current epoch: 125
+Loss for worker 0 on epoch 125: 232611.08359938054
+Loss for epoch 125: 232611.08359938054±0.0
+Current epoch: 126
+Loss for worker 0 on epoch 126: 302131.70043845027
+Loss for epoch 126: 302131.70043845027±0.0
+Current epoch: 127
+Loss for worker 0 on epoch 127: 280403.9883601925
+Loss for epoch 127: 280403.9883601925±0.0
+Current epoch: 128
+Loss for worker 0 on epoch 128: 372452.0831138193
+Loss for epoch 128: 372452.0831138193±0.0
+Current epoch: 129
+Loss for worker 0 on epoch 129: 552008.1464046747
+Loss for epoch 129: 552008.1464046747±0.0
+Current epoch: 130
+Loss for worker 0 on epoch 130: 317604.76878680417
+Loss for epoch 130: 317604.76878680417±0.0
+Current epoch: 131
+Loss for worker 0 on epoch 131: 350895.8383571618
+Loss for epoch 131: 350895.8383571618±0.0
+Current epoch: 132
+Loss for worker 0 on epoch 132: 328593.7423519931
+Loss for epoch 132: 328593.7423519931±0.0
+Current epoch: 133
+Loss for worker 0 on epoch 133: 239895.96110040531
+Loss for epoch 133: 239895.96110040531±0.0
+Current epoch: 134
+Loss for worker 0 on epoch 134: 453800.71740726155
+Loss for epoch 134: 453800.71740726155±0.0
+Current epoch: 135
+Loss for worker 0 on epoch 135: 208870.08851413822
+Loss for epoch 135: 208870.08851413822±0.0
+Current epoch: 136
+Loss for worker 0 on epoch 136: 452119.75625842315
+Loss for epoch 136: 452119.75625842315±0.0
+Current epoch: 137
+Loss for worker 0 on epoch 137: 366071.80844707484
+Loss for epoch 137: 366071.80844707484±0.0
+Current epoch: 138
+Loss for worker 0 on epoch 138: 452334.40330371214
+Loss for epoch 138: 452334.40330371214±0.0
+Current epoch: 139
+Loss for worker 0 on epoch 139: 354709.76844383543
+Loss for epoch 139: 354709.76844383543±0.0
+Current epoch: 140
+Loss for worker 0 on epoch 140: 299175.16659844277
+Loss for epoch 140: 299175.16659844277±0.0
+Current epoch: 141
+Loss for worker 0 on epoch 141: 237509.09127879923
+Loss for epoch 141: 237509.09127879923±0.0
+Current epoch: 142
+Loss for worker 0 on epoch 142: 207234.11930226724
+Loss for epoch 142: 207234.11930226724±0.0
+Current epoch: 143
+Loss for worker 0 on epoch 143: 273501.76286074985
+Loss for epoch 143: 273501.76286074985±0.0
+Current epoch: 144
+Loss for worker 0 on epoch 144: 172656.37235397627
+Loss for epoch 144: 172656.37235397627±0.0
+Current epoch: 145
+Loss for worker 0 on epoch 145: 208408.5263606259
+Loss for epoch 145: 208408.5263606259±0.0
+Current epoch: 146
+Loss for worker 0 on epoch 146: 192579.52443052642
+Loss for epoch 146: 192579.52443052642±0.0
+Current epoch: 147
+Loss for worker 0 on epoch 147: 195474.7990701981
+Loss for epoch 147: 195474.7990701981±0.0
+Current epoch: 148
+Loss for worker 0 on epoch 148: 322723.2124844143
+Loss for epoch 148: 322723.2124844143±0.0
+Current epoch: 149
+Loss for worker 0 on epoch 149: 188623.87807176996
+Loss for epoch 149: 188623.87807176996±0.0
+Current epoch: 150
+Loss for worker 0 on epoch 150: 253705.26870220387
+Loss for epoch 150: 253705.26870220387±0.0
+Current epoch: 151
+Loss for worker 0 on epoch 151: 193119.6610075399
+Loss for epoch 151: 193119.6610075399±0.0
+Current epoch: 152
+Loss for worker 0 on epoch 152: 211832.5789069293
+Loss for epoch 152: 211832.5789069293±0.0
+Current epoch: 153
+Loss for worker 0 on epoch 153: 175269.4457172841
+Loss for epoch 153: 175269.4457172841±0.0
+Current epoch: 154
+Loss for worker 0 on epoch 154: 233069.93559014858
+Loss for epoch 154: 233069.93559014858±0.0
+Current epoch: 155
+Loss for worker 0 on epoch 155: 193959.5588020056
+Loss for epoch 155: 193959.5588020056±0.0
+Current epoch: 156
+Loss for worker 0 on epoch 156: 190637.52091923563
+Loss for epoch 156: 190637.52091923563±0.0
+Current epoch: 157
+Loss for worker 0 on epoch 157: 257640.65678555594
+Loss for epoch 157: 257640.65678555594±0.0
+Current epoch: 158
+Loss for worker 0 on epoch 158: 188747.8297180741
+Loss for epoch 158: 188747.8297180741±0.0
+Current epoch: 159
+Loss for worker 0 on epoch 159: 189929.56492243576
+Loss for epoch 159: 189929.56492243576±0.0
+Current epoch: 160
+Loss for worker 0 on epoch 160: 158343.90587002752
+Loss for epoch 160: 158343.90587002752±0.0
+Current epoch: 161
+Loss for worker 0 on epoch 161: 221180.27016559485
+Loss for epoch 161: 221180.27016559485±0.0
+Current epoch: 162
+Loss for worker 0 on epoch 162: 175995.31882812118
+Loss for epoch 162: 175995.31882812118±0.0
+Current epoch: 163
+Loss for worker 0 on epoch 163: 330377.55192639545
+Loss for epoch 163: 330377.55192639545±0.0
+Current epoch: 164
+Loss for worker 0 on epoch 164: 297979.78445341944
+Loss for epoch 164: 297979.78445341944±0.0
+Current epoch: 165
+Loss for worker 0 on epoch 165: 262425.7388149123
+Loss for epoch 165: 262425.7388149123±0.0
+Current epoch: 166
+Loss for worker 0 on epoch 166: 214150.59282603767
+Loss for epoch 166: 214150.59282603767±0.0
+Current epoch: 167
+Loss for worker 0 on epoch 167: 183297.33954243333
+Loss for epoch 167: 183297.33954243333±0.0
+Current epoch: 168
+Loss for worker 0 on epoch 168: 249235.68668044018
+Loss for epoch 168: 249235.68668044018±0.0
+Current epoch: 169
+Loss for worker 0 on epoch 169: 240319.7941812303
+Loss for epoch 169: 240319.7941812303±0.0
+Current epoch: 170
+Loss for worker 0 on epoch 170: 165479.7410919874
+Loss for epoch 170: 165479.7410919874±0.0
+Current epoch: 171
+Loss for worker 0 on epoch 171: 311700.0319918148
+Loss for epoch 171: 311700.0319918148±0.0
+Current epoch: 172
+Loss for worker 0 on epoch 172: 151191.0738076264
+Loss for epoch 172: 151191.0738076264±0.0
+Current epoch: 173
+Loss for worker 0 on epoch 173: 298994.2092106376
+Loss for epoch 173: 298994.2092106376±0.0
+Current epoch: 174
+Loss for worker 0 on epoch 174: 195180.13098393692
+Loss for epoch 174: 195180.13098393692±0.0
+Current epoch: 175
+Loss for worker 0 on epoch 175: 173083.4641614284
+Loss for epoch 175: 173083.4641614284±0.0
+Current epoch: 176
+Loss for worker 0 on epoch 176: 186080.48166849735
+Loss for epoch 176: 186080.48166849735±0.0
+Current epoch: 177
+Loss for worker 0 on epoch 177: 215491.0049168947
+Loss for epoch 177: 215491.0049168947±0.0
+Current epoch: 178
+Loss for worker 0 on epoch 178: 305778.92598840914
+Loss for epoch 178: 305778.92598840914±0.0
+Current epoch: 179
+Loss for worker 0 on epoch 179: 133733.67972401288
+Loss for epoch 179: 133733.67972401288±0.0
+Current epoch: 180
+Loss for worker 0 on epoch 180: 161023.0784306466
+Loss for epoch 180: 161023.0784306466±0.0
+Current epoch: 181
+Loss for worker 0 on epoch 181: 230856.19709170045
+Loss for epoch 181: 230856.19709170045±0.0
+Current epoch: 182
+Loss for worker 0 on epoch 182: 164586.4370607736
+Loss for epoch 182: 164586.4370607736±0.0
+Current epoch: 183
+Loss for worker 0 on epoch 183: 204484.88161254587
+Loss for epoch 183: 204484.88161254587±0.0
+Current epoch: 184
+Loss for worker 0 on epoch 184: 195373.8942265713
+Loss for epoch 184: 195373.8942265713±0.0
+Current epoch: 185
+Loss for worker 0 on epoch 185: 191590.35533982373
+Loss for epoch 185: 191590.35533982373±0.0
+Current epoch: 186
+Loss for worker 0 on epoch 186: 215939.43464594908
+Loss for epoch 186: 215939.43464594908±0.0
+Current epoch: 187
+Loss for worker 0 on epoch 187: 290880.1676297272
+Loss for epoch 187: 290880.1676297272±0.0
+Current epoch: 188
+Loss for worker 0 on epoch 188: 297506.6738663768
+Loss for epoch 188: 297506.6738663768±0.0
+Current epoch: 189
+Loss for worker 0 on epoch 189: 292101.31098147214
+Loss for epoch 189: 292101.31098147214±0.0
+Current epoch: 190
+Loss for worker 0 on epoch 190: 179438.8192173236
+Loss for epoch 190: 179438.8192173236±0.0
+Current epoch: 191
+Loss for worker 0 on epoch 191: 270240.53464306984
+Loss for epoch 191: 270240.53464306984±0.0
+Current epoch: 192
+Loss for worker 0 on epoch 192: 171384.27228068112
+Loss for epoch 192: 171384.27228068112±0.0
+Current epoch: 193
+Loss for worker 0 on epoch 193: 217656.14877284586
+Loss for epoch 193: 217656.14877284586±0.0
+Current epoch: 194
+Loss for worker 0 on epoch 194: 309927.5496040523
+Loss for epoch 194: 309927.5496040523±0.0
+Current epoch: 195
+Loss for worker 0 on epoch 195: 261560.43104228145
+Loss for epoch 195: 261560.43104228145±0.0
+Current epoch: 196
+Loss for worker 0 on epoch 196: 419968.8134488973
+Loss for epoch 196: 419968.8134488973±0.0
+Current epoch: 197
+Loss for worker 0 on epoch 197: 287965.08348953543
+Loss for epoch 197: 287965.08348953543±0.0
+Current epoch: 198
+Loss for worker 0 on epoch 198: 171550.62412182684
+Loss for epoch 198: 171550.62412182684±0.0
+Current epoch: 199
+Loss for worker 0 on epoch 199: 315274.9580775658
+Loss for epoch 199: 315274.9580775658±0.0

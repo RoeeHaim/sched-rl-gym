@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+*.pyd
 
 # Distribution / packaging
 dist/
@@ -15,6 +16,7 @@ build/
 # Virtual environments
 .venv/
 venv/
+env/
 ENV/
 
 # IDE
@@ -38,6 +40,7 @@ Thumbs.db
 # Misc
 *.pth
 checkpoint/
+checkpoint-run1/
 runs/
 
 # Rust
