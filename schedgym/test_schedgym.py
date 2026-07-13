@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 import os
 import gzip
 import random
@@ -10,9 +7,9 @@ import itertools
 import urllib.request
 
 from pathlib import Path
-from typing import Union, cast
+from typing import cast
 
-import gym
+import gymnasium
 import numpy as np
 
 from . import simulator, job, workload, pool, event, heap, scheduler
@@ -22,7 +19,7 @@ from .workload import swf_parser
 from .envs import base, deeprm_env, compact_env
 
 
-class MockLugarRL(object):
+class MockLugarRL:
     def __getattr__(self, _):
         return lambda: None
 
@@ -106,6 +103,48 @@ class TestSimulator(unittest.TestCase):
                 self.workload,
                 self.scheduler,
             )
+
+    def test_time_based_simulator_batched_submit_preserves_queue_snapshots(self):
+        class BurstWorkload(workload.WorkloadGenerator):
+            def __init__(self, jobs):
+                self.current_time = 0
+                self._jobs = jobs
+                self._done = False
+
+            def step(self, offset: int = 1) -> list[job.Job | None]:
+                self.current_time += offset
+                if self._done:
+                    return []
+                self._done = True
+                return self._jobs
+
+            def __len__(self) -> int:
+                return 1
+
+            def peek(self) -> job.Job | None:
+                return None
+
+        j1 = self.small_job_parameters.sample(1)
+        j2 = self.small_job_parameters.sample(1)
+        j3 = self.small_job_parameters.sample(1)
+        burst = BurstWorkload([j1, None, j2, j3])
+        sim = simulator.TimeBasedSimulator(burst, self.scheduler)
+
+        sim.step()
+
+        self.assertEqual([j1, j2, j3], self.scheduler.queue_admission)
+        self.assertEqual([1, 1, 1], [j.submission_time for j in (j1, j2, j3)])
+        self.assertEqual([0, 1, 2], [j.queue_size for j in (j1, j2, j3)])
+        self.assertEqual([16, 16, 16], [j.free_processors for j in (j1, j2, j3)])
+        self.assertEqual(
+            [
+                0,
+                j1.requested_time * j1.requested_processors,
+                j1.requested_time * j1.requested_processors
+                + j2.requested_time * j2.requested_processors,
+            ],
+            [j.queued_work for j in (j1, j2, j3)],
+        )
 
 
 class TestJobParameters(unittest.TestCase):
@@ -214,9 +253,7 @@ class TestScheduler(unittest.TestCase):
 
         self.assertTrue(self.scheduler.can_schedule_now(j))
         self.assertTrue(
-            self.scheduler.fits(
-                0, j, self.scheduler.cluster.clone(), self.events
-            )
+            self.scheduler.fits(0, j, self.scheduler.cluster.clone(), self.events)
         )
 
     def test_fits_partially_filled_pool_with_no_events(self):
@@ -226,9 +263,7 @@ class TestScheduler(unittest.TestCase):
         j = self.jp.sample()
         self.assertTrue(self.scheduler.can_schedule_now(j))
         self.assertTrue(
-            self.scheduler.fits(
-                0, j, self.scheduler.cluster.clone(), self.events
-            )
+            self.scheduler.fits(0, j, self.scheduler.cluster.clone(), self.events)
         )
 
     def test_doesnt_fit_fully_filled_pool_with_no_events(self):
@@ -238,9 +273,7 @@ class TestScheduler(unittest.TestCase):
         j = self.jp.sample()
         self.assertFalse(self.scheduler.can_schedule_now(j))
         self.assertFalse(
-            self.scheduler.fits(
-                0, j, self.scheduler.cluster.clone(), self.events
-            )
+            self.scheduler.fits(0, j, self.scheduler.cluster.clone(), self.events)
         )
 
     def test_past_events_dont_influence_the_present(self):
@@ -256,21 +289,15 @@ class TestScheduler(unittest.TestCase):
         j.requested_time = 5
 
         self.assertTrue(
-            self.scheduler.fits(
-                20, j, self.scheduler.cluster.clone(), self.events
-            )
+            self.scheduler.fits(20, j, self.scheduler.cluster.clone(), self.events)
         )
 
     def play_events(self, time):
         for e in (e for e in self.events if e.time <= time):
             if e.type == event.EventType.JOB_START:
-                self.scheduler.cluster.processors.allocate(
-                    e.job.resources.processors
-                )
+                self.scheduler.cluster.processors.allocate(e.job.resources.processors)
             else:
-                self.scheduler.cluster.processors.free(
-                    e.job.resources.processors
-                )
+                self.scheduler.cluster.processors.free(e.job.resources.processors)
 
     def test_eventually_fits_partially_filled_pool(self):
         for i in range(5):
@@ -283,17 +310,13 @@ class TestScheduler(unittest.TestCase):
 
         self.play_events(5)
         self.assertFalse(
-            self.scheduler.fits(
-                5, j, self.scheduler.cluster.clone(), self.events
-            )
+            self.scheduler.fits(5, j, self.scheduler.cluster.clone(), self.events)
         )
 
         self.scheduler = MockScheduler(10, 10000)
         self.play_events(6)
         self.assertTrue(
-            self.scheduler.fits(
-                6, j, self.scheduler.cluster.clone(), self.events
-            )
+            self.scheduler.fits(6, j, self.scheduler.cluster.clone(), self.events)
         )
 
     def test_should_fail_to_add_malformed_job(self):
@@ -403,6 +426,30 @@ class TestFifoBasedSchedulers(unittest.TestCase):
         self.scheduler.step(2)
         self.assertQueuesSane(3, 1, 0, 0, 0)
 
+    def test_stats_track_cached_aggregates(self):
+        j = self.small_job_parameters.sample(1)
+        j.execution_time = 2
+        self.scheduler.submit(j)
+        self.assertAlmostEqual(
+            self.scheduler.load,
+            j.requested_processors / self.scheduler.number_of_processors,
+        )
+
+        self.scheduler.step()
+        self.assertAlmostEqual(
+            self.scheduler.load,
+            j.requested_processors / self.scheduler.number_of_processors,
+        )
+
+        self.scheduler.step(2)
+        self.assertEqual(self.scheduler.load, 0.0)
+        self.assertEqual(self.scheduler.makespan, j.finish_time)
+
+        stats = self.scheduler.stats[max(self.scheduler.stats)]
+        self.assertEqual(stats.makespan, j.finish_time)
+        self.assertAlmostEqual(stats.slowdown, j.slowdown)
+        self.assertAlmostEqual(stats.bsld, j.bounded_slowdown)
+
     def test_two_jobs_until_completion(self):
         j = self.small_job_parameters.sample(1)
         j.execution_time = j.requested_time = 5
@@ -443,6 +490,35 @@ class TestFifoBasedSchedulers(unittest.TestCase):
         self.assertNotEqual(
             self.scheduler.current_time, self.scheduler.find_first_time_for(j)
         )
+
+    def test_fifo_removes_only_scheduled_prefix(self):
+        s = scheduler.FifoScheduler(3, 999999)
+        j1 = self.make_job(0, 5, 1)
+        j2 = self.make_job(0, 5, 2)
+        j3 = self.make_job(0, 5, 2)
+        j4 = self.make_job(0, 5, 1)
+        s.submit([j1, j2, j3, j4])
+
+        s.schedule()
+
+        self.assertEqual([j1, j2], list(s.queue_waiting))
+        self.assertEqual([j3, j4], s.queue_admission)
+
+    def test_fifo_keeps_admission_queue_when_first_job_cannot_schedule(self):
+        s = scheduler.FifoScheduler(2, 999999)
+        running = self.make_job(0, 5, 2)
+        running.resources.processors = pool.IntervalTree([pool.Interval(0, 2)])
+        running.resources.memory = pool.IntervalTree([pool.Interval(0, 1)])
+        s.assign_schedule(running, running.resources, 0)
+        s.step()
+
+        j1 = self.make_job(1, 5, 1)
+        j2 = self.make_job(1, 5, 1)
+        s.submit([j1, j2])
+
+        s.schedule()
+
+        self.assertEqual([j1, j2], s.queue_admission)
 
     def test_easy_submitting_six_jobs(self):
         j1 = self.make_job(0, 2, 2)
@@ -584,9 +660,7 @@ class TestBinomialWorkloadGenerator(unittest.TestCase):
 class TestResourcePool(unittest.TestCase):
     def setUp(self) -> None:
         self.max_size = 32
-        self.resource_pool = pool.ResourcePool(
-            pool.ResourceType.CPU, self.max_size
-        )
+        self.resource_pool = pool.ResourcePool(pool.ResourceType.CPU, self.max_size)
 
     def test_zero_used_resources(self):
         self.assertEqual(0, self.resource_pool.used_resources)
@@ -758,6 +832,13 @@ class TestEvent(unittest.TestCase):
         present = list(self.req.step())
         self.assertEqual(0, len(present))
 
+    def test_past_bounded(self):
+        for i in range(1, 2001):
+            self.req.add(self.build_event(event.EventType.JOB_FINISH, (0, 2), i))
+        list(self.req.step(2001))
+        self.assertLessEqual(len(self.req.past), 1000)
+        self.assertEqual(2000, self.req.last.time)
+
 
 class TestHeap(unittest.TestCase):
     def setUp(self) -> None:
@@ -867,32 +948,22 @@ class TestCluster(unittest.TestCase):
         self.assertFalse(cluster.fits(j))
 
     def test_fit_ignoring_memory(self):
-        cluster = clstr.Cluster(
-            self.processors, self.memory, ignore_memory=True
-        )
+        cluster = clstr.Cluster(self.processors, self.memory, ignore_memory=True)
         self.assertTrue(cluster.fits(self.make_job(0, 10, 1, 1024)))
-        self.assertTrue(
-            cluster.fits(self.make_job(0, 10, self.processors, 1024))
-        )
+        self.assertTrue(cluster.fits(self.make_job(0, 10, self.processors, 1024)))
         self.assertTrue(
             cluster.fits(self.make_job(0, 10, self.processors, self.memory))
         )
         self.assertTrue(
-            cluster.fits(
-                self.make_job(0, 10, self.processors, self.memory + 1)
-            )
+            cluster.fits(self.make_job(0, 10, self.processors, self.memory + 1))
         )
         self.assertFalse(
-            cluster.fits(
-                self.make_job(0, 10, self.processors + 1, self.memory + 1)
-            )
+            cluster.fits(self.make_job(0, 10, self.processors + 1, self.memory + 1))
         )
 
     def test_free_resources(self):
         cluster = clstr.Cluster(self.processors, self.memory)
-        self.assertEqual(
-            cluster.free_resources, (self.processors, self.memory)
-        )
+        self.assertEqual(cluster.free_resources, (self.processors, self.memory))
 
     def test_allocation(self):
         cluster = clstr.Cluster(self.processors, self.memory)
@@ -909,9 +980,7 @@ class TestCluster(unittest.TestCase):
         with self.assertRaises(AssertionError):
             cluster.allocate(j)
         j = self.make_job(0, 10, self.processors, self.memory)
-        j.resources.processors = pool.IntervalTree(
-            [pool.Interval(0, self.processors)]
-        )
+        j.resources.processors = pool.IntervalTree([pool.Interval(0, self.processors)])
         j.resources.memory = pool.IntervalTree([pool.Interval(0, self.memory)])
         j.ignore_memory = False
         cluster.allocate(j)
@@ -987,22 +1056,17 @@ class TestSchedulers(unittest.TestCase):
         top = max(
             s.queue_admission,
             key=lambda j: s.free_resources[0] * j.requested_processors
-            + s.free_resources[1]
-            + j.requested_memory,
+            + s.free_resources[1] * j.requested_memory,
         )
         s.schedule()
-        self.assertEqual(
-            s.get_priority(top), s.get_priority(s.queue_waiting[0])
-        )
+        self.assertEqual(s.get_priority(top), s.get_priority(s.queue_waiting[0]))
 
     def test_tetris_scheduler_behaving_like_sjf(self):
         s = scheduler.TetrisScheduler(64, 2048, 0.0)
         self.submit_jobs(s, 10)
         top = min(s.queue_admission, key=lambda j: j.requested_time)
         s.schedule()
-        self.assertEqual(
-            s.get_priority(top), s.get_priority(s.queue_waiting[0])
-        )
+        self.assertEqual(s.get_priority(top), s.get_priority(s.queue_waiting[0]))
 
     def test_tetris_scheduler(self):
         s = scheduler.TetrisScheduler(64, 2048, 0.5)
@@ -1013,14 +1077,11 @@ class TestSchedulers(unittest.TestCase):
             + 0.5
             * (
                 s.free_resources[0] * j.requested_processors
-                + s.free_resources[1]
-                + j.requested_memory
+                + s.free_resources[1] * j.requested_memory
             ),
         )
         s.schedule()
-        self.assertEqual(
-            s.get_priority(top), s.get_priority(s.queue_waiting[0])
-        )
+        self.assertEqual(s.get_priority(top), s.get_priority(s.queue_waiting[0]))
 
     def test_random_scheduler(self):
         s = scheduler.RandomScheduler(16, 2048)
@@ -1057,13 +1118,9 @@ class TestSchedulers(unittest.TestCase):
             s.step()
             state, jobs, backlog = s.state(timesteps, job_slots)
 
-            self.assertEqual(
-                max(len(s.queue_admission) - job_slots, 0), backlog
-            )
+            self.assertEqual(max(len(s.queue_admission) - job_slots, 0), backlog)
             for j in s.queue_admission[:job_slots]:
-                self.assertEqual(
-                    j.requested_time, jobs[j.slot_position].requested_time
-                )
+                self.assertEqual(j.requested_time, jobs[j.slot_position].requested_time)
                 self.assertEqual(
                     j.requested_memory, jobs[j.slot_position].requested_memory
                 )
@@ -1075,8 +1132,8 @@ class TestSchedulers(unittest.TestCase):
 
 class TestSwfGenerator(unittest.TestCase):
     TOTAL_JOBS = 122060
-    TEST_DIR = 'test'
-    TRACE_FILE = 'LANL-CM5-1994-4.1-cln.swf.gz'
+    TEST_DIR = "test"
+    TRACE_FILE = "LANL-CM5-1994-4.1-cln.swf.gz"
 
     def setUp(self) -> None:
         self.tracefile = Path(self.TEST_DIR) / self.TRACE_FILE
@@ -1085,11 +1142,11 @@ class TestSwfGenerator(unittest.TestCase):
         except FileNotFoundError:
             Path(self.TEST_DIR).mkdir(exist_ok=True)
             tmp = tempfile.NamedTemporaryFile(
-                dir=self.TEST_DIR, mode='wb', delete=False
+                dir=self.TEST_DIR, mode="wb", delete=False
             )
             data = urllib.request.urlopen(
-                'http://www.cs.huji.ac.il/labs/parallel/workload/l_lanl_cm5/'
-                f'{self.TRACE_FILE}',
+                "http://www.cs.huji.ac.il/labs/parallel/workload/l_lanl_cm5/"
+                f"{self.TRACE_FILE}",
             )
             tmp.write(gzip.decompress(data.read()))
             tmp.close()
@@ -1164,10 +1221,7 @@ class TestSwfGenerator(unittest.TestCase):
 
     def test_last_event_time(self):
         wl = self.load(offset=1, length=1)
-        self.assertEqual(
-            wl.last_event_time,
-            cast(job.Job, wl.peek()).submission_time
-        )
+        self.assertEqual(wl.last_event_time, cast(job.Job, wl.peek()).submission_time)
         j = wl.step(wl.last_event_time + 1)[0]
         with self.assertRaises(StopIteration):
             wl.step()
@@ -1177,11 +1231,11 @@ class TestSwfGenerator(unittest.TestCase):
 class TestEnvWorkload(unittest.TestCase):
     def test_distribution_factory(self):
         config = {
-            'type': 'deeprm',
-            'new_job_rate': 1.0,
-            'small_job_chance': 0.0,
-            'max_job_len': 10,
-            'max_job_size': 10,
+            "type": "deeprm",
+            "new_job_rate": 1.0,
+            "small_job_chance": 0.0,
+            "max_job_len": 10,
+            "max_job_size": 10,
         }
         wl = env_workload.build(config)
         j = cast(job.Job, wl.step()[0])
@@ -1191,16 +1245,12 @@ class TestEnvWorkload(unittest.TestCase):
 class TestBaseEnv(unittest.TestCase):
     def test_rewardjobs_parsing(self):
         with self.assertRaises(ValueError):
-            base.RewardJobs.from_str('none')
-        for string in self.all_casings('all'):
-            self.assertEqual(
-                base.RewardJobs.from_str(string), base.RewardJobs.ALL
-            )
-        for string in self.all_casings('waiting'):
-            self.assertEqual(
-                base.RewardJobs.from_str(string), base.RewardJobs.WAITING
-            )
-        for string in self.all_casings('job_slots'):
+            base.RewardJobs.from_str("none")
+        for string in self.all_casings("all"):
+            self.assertEqual(base.RewardJobs.from_str(string), base.RewardJobs.ALL)
+        for string in self.all_casings("waiting"):
+            self.assertEqual(base.RewardJobs.from_str(string), base.RewardJobs.WAITING)
+        for string in self.all_casings("job_slots"):
             self.assertEqual(
                 base.RewardJobs.from_str(string), base.RewardJobs.JOB_SLOTS
             )
@@ -1209,7 +1259,7 @@ class TestBaseEnv(unittest.TestCase):
     def all_casings(string):
         return list(
             map(
-                ''.join,
+                "".join,
                 itertools.product(*zip(string.upper(), string.lower())),
             )
         )
@@ -1217,19 +1267,21 @@ class TestBaseEnv(unittest.TestCase):
 
 class TestCompactEnv(unittest.TestCase):
     def test_instantiation_with_gym(self):
-        gym.make('CompactRM-v0')
+        gymnasium.make("CompactRM-v0")
 
     def test_environment_with_sjf_agent_to_completion(self):
-        for simulation_type in 'time-based event-based'.split():
-            env: compact_env.CompactRmEnv = gym.make(  # type: ignore
-                'CompactRM-v0', simulation_type=simulation_type,
-                ignore_memory=True
-            )
-            observation = env.reset()
+        for simulation_type in "time-based event-based".split():
+            env: compact_env.CompactRmEnv = gymnasium.make(  # type: ignore
+                "CompactRM-v0",
+                simulation_type=simulation_type,
+                ignore_memory=True,
+            ).unwrapped
+            observation, _ = env.reset()
             action = 0
             done = False
             while not done:
-                observation, _, done, extra = env.step(action)
+                observation, _, terminated, truncated, extra = env.step(action)
+                done = terminated or truncated
                 action = env.scheduler.sjf_action(env.job_slots)
                 free_procs = (
                     env.scheduler.number_of_processors
@@ -1242,7 +1294,6 @@ class TestCompactEnv(unittest.TestCase):
                     )
                     if j.requested_processors <= free_procs
                 ]
-                print(free_procs, submission_times, env.scheduler.queue_admission)
                 for j, i in sorted(submission_times):
                     self.assertEqual(action, i)
                     break
@@ -1250,74 +1301,75 @@ class TestCompactEnv(unittest.TestCase):
                     self.assertEqual(action, env.job_slots)
 
     def test_scheduler_identity(self):
-        env: deeprm_env.DeepRmEnv = gym.make(  # type: ignore
-            'CompactRM-v0',
-            **{'use_raw_state': True, 'simulation_type': 'event-based'},
-        )
-        _ = env.reset()
+        env: deeprm_env.DeepRmEnv = gymnasium.make(  # type: ignore
+            "CompactRM-v0",
+            **{"use_raw_state": True, "simulation_type": "event-based"},
+        ).unwrapped
+        _, _ = env.reset()
         self.assertEqual(id(env.scheduler), id(env.simulator.scheduler))
 
     def test_synthetic_wl_auto_time_limit(self):
-        env: compact_env.CompactRmEnv = gym.make(  # type: ignore
-            'CompactRM-v0',
+        env: compact_env.CompactRmEnv = gymnasium.make(  # type: ignore
+            "CompactRM-v0",
             **{
-                'use_raw_state': True,
-                'time_limit': None,
-                'simulation_type': 'event-based',
-                'ignore_memory': True,
-                'workload': {
-                    'type': 'lublin',
-                    'length': 10,
-                    'nodes': 10,
-                }
+                "use_raw_state": True,
+                "time_limit": None,
+                "simulation_type": "event-based",
+                "ignore_memory": True,
+                "workload": {
+                    "type": "lublin",
+                    "length": 10,
+                    "nodes": 10,
+                },
             },
         )
-        obs = env.reset()
+        obs, _ = env.reset()
         self.assertNotIn(None, obs)
-        obs, _, _, _ = env.step(0)
+        obs, _, _, _, _ = env.step(0)
         self.assertNotIn(None, obs)
 
 
 class TestDeepRmEnv(unittest.TestCase):
     def test_instantiation_with_gym(self):
-        gym.make('DeepRM-v0')
+        gymnasium.make("DeepRM-v0")
 
     def test_environment_with_trivial_agent(self):
-        for simulation_type in 'time-based event-based'.split():
-            env: deeprm_env.DeepRmEnv = gym.make(  # type: ignore
-                'DeepRM-v0',
+        for simulation_type in "time-based event-based".split():
+            env: deeprm_env.DeepRmEnv = gymnasium.make(  # type: ignore
+                "DeepRM-v0",
                 **{
-                    'use_raw_state': True,
-                    'simulation_type': simulation_type,
+                    "use_raw_state": True,
+                    "simulation_type": simulation_type,
                 },
             )
-            _ = env.reset()
+            _, _ = env.reset()
             action = 0
             done = False
             while not done:
-                _, _, done, _ = env.step(action)
+                _, _, terminated, truncated, _ = env.step(action)
+                done = terminated or truncated
             self.assertTrue(done)
 
     def test_environment_with_event_based_simulator(self):
-        env: deeprm_env.DeepRmEnv = gym.make(  # type: ignore
-            'DeepRM-v0',
-            **{'use_raw_state': True, 'simulation_type': 'event-based'},
+        env: deeprm_env.DeepRmEnv = gymnasium.make(  # type: ignore
+            "DeepRM-v0",
+            **{"use_raw_state": True, "simulation_type": "event-based"},
         )
-        _ = env.reset()
+        _, _ = env.reset()
         action = 0
         done = False
         while not done:
-            _, _, done, _ = env.step(action)
+            _, _, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
         self.assertTrue(done)
 
     def test_scheduler_identity(self):
-        env: deeprm_env.DeepRmEnv = gym.make(  # type: ignore
-            'DeepRM-v0',
-            **{'use_raw_state': True, 'simulation_type': 'event-based'},
-        )
-        _ = env.reset()
+        env: deeprm_env.DeepRmEnv = gymnasium.make(  # type: ignore
+            "DeepRM-v0",
+            **{"use_raw_state": True, "simulation_type": "event-based"},
+        ).unwrapped
+        _, _ = env.reset()
         self.assertEqual(id(env.scheduler), id(env.simulator.scheduler))
-
 
 
 class TestRewardMappers(unittest.TestCase):
@@ -1351,34 +1403,27 @@ class TestRewardMappers(unittest.TestCase):
         total_jobs = 100
         scheduled_jobs = 5
         execution_time = 10
-        reward_methods = ['all', 'waiting', 'job-slots', 'running-job-slots']
-        for e in 'DeepRM-v0 CompactRM-v0'.split():
+        reward_methods = ["all", "waiting", "job-slots", "running-job-slots"]
+        for e in "DeepRM-v0 CompactRM-v0".split():
             for m, mapper in enumerate(reward_methods):
-                env: Union[
-                    compact_env.CompactRmEnv, deeprm_env.DeepRmEnv
-                ] = gym.make(
+                env: compact_env.CompactRmEnv | deeprm_env.DeepRmEnv = gymnasium.make(
                     e,
                     reward_jobs=mapper,
                     workload=dict(
-                        type='deeprm',
+                        type="deeprm",
                         ignore_memory=False,
                         new_job_rate=0.0,
                         small_job_chance=0.0,
                         max_job_len=15,
                         max_job_size=10,
                     ),
-                )
+                ).unwrapped
                 rewards = [
                     -np.sum([1 / execution_time for _ in range(total_jobs)]),
                     -np.sum(
-                        [
-                            1 / execution_time
-                            for _ in range(total_jobs - scheduled_jobs)
-                        ]
+                        [1 / execution_time for _ in range(total_jobs - scheduled_jobs)]
                     ),
-                    -np.sum(
-                        [1 / execution_time for _ in range(env.job_slots)]
-                    ),
+                    -np.sum([1 / execution_time for _ in range(env.job_slots)]),
                     -np.sum(
                         [
                             1 / execution_time
@@ -1387,10 +1432,7 @@ class TestRewardMappers(unittest.TestCase):
                     ),
                 ]
                 env.reset()
-                jobs = [
-                    self.make_job(0, execution_time, 1)
-                    for i in range(total_jobs)
-                ]
+                jobs = [self.make_job(0, execution_time, 1) for i in range(total_jobs)]
                 env.scheduler.submit(jobs)
                 for i in range(scheduled_jobs):
                     env.step(0)
@@ -1398,3 +1440,78 @@ class TestRewardMappers(unittest.TestCase):
                 env.step(env.job_slots)  # forward time
                 self.assertEqual(env.simulator.current_time, 1)
                 self.assertAlmostEqual(env.reward, rewards[m], delta=1e-5)
+
+
+class TestHeapHashCollision(unittest.TestCase):
+    """Tests that expose bugs in PyHeap when two items share the same hash.
+
+    In CPython, hash(-1) == hash(-2) == -2, so -1 and -2 naturally collide.
+    Bug 1 (__contains__): if bucket.len() == 1 returns True without py_eq check.
+    Bug 2 (remove_by_hash): if bucket.len() == 1 takes pos=0 without equality check.
+    """
+
+    def test_contains_hash_collision(self):
+        h = heap.Heap()
+        h.add(-1)
+        self.assertTrue(-1 in h)
+        self.assertFalse(-2 in h)  # FAILS with current Rust: returns True due to Bug 1
+
+    def test_remove_hash_collision(self):
+        h = heap.Heap()
+        h.add(-1)
+        h.add(-2)
+        h.remove(-2)
+        self.assertTrue(-1 in h)  # -1 should still be there
+        self.assertFalse(-2 in h)  # FAILS: remove_by_hash removes wrong item (Bug 2)
+
+    def test_contains_after_remove_collision(self):
+        # After removing -1, popping should give -2 (not crash)
+        h = heap.Heap()
+        h.add(-1, (1, 0))
+        h.add(-2, (2, 0))
+        h.remove(-1)
+        result = h.pop()
+        self.assertEqual(result, -2)
+
+    def test_pop_order_with_collision(self):
+        # Both -1 and -2 in heap — pop order must be correct by priority
+        h = heap.Heap()
+        h.add(-1, (1, 0))  # lower priority number = pops first (min-heap)
+        h.add(-2, (2, 0))
+        first = h.pop()
+        second = h.pop()
+        self.assertEqual(first, -1)
+        self.assertEqual(second, -2)
+
+    def test_copy_no_dead_entries(self):
+        import copy
+
+        h = heap.Heap()
+        h.add("a", (1, 0))
+        h.add("b", (2, 0))
+        h.add("c", (3, 0))
+        h.remove("b")
+        h2 = copy.copy(h)
+        self.assertEqual(len(h2), 2)
+        self.assertIn("a", h2)
+        self.assertNotIn("b", h2)
+        self.assertIn("c", h2)
+        p1 = h2.pop()
+        p2 = h2.pop()
+        self.assertEqual(p1, "a")
+        self.assertEqual(p2, "c")
+        self.assertEqual(len(h2), 0)
+        self.assertEqual(len(h), 2)
+
+    def test_copy_preserves_order(self):
+        import copy
+
+        h = heap.Heap()
+        h.add("x", (3, 0))
+        h.add("y", (1, 0))
+        h.add("z", (4, 0))
+        h.add("w", (2, 0))
+        h2 = copy.copy(h)
+        results_orig = [h.pop(), h.pop(), h.pop(), h.pop()]
+        results_copy = [h2.pop(), h2.pop(), h2.pop(), h2.pop()]
+        self.assertEqual(results_orig, results_copy)

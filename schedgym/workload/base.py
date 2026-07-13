@@ -1,10 +1,6 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """base - base module for all workload generators"""
 
 from abc import ABC, abstractmethod
-from typing import Optional, List
 
 from schedgym.job import Job
 
@@ -15,7 +11,7 @@ class WorkloadGenerator(ABC):
     current_time: int
 
     @abstractmethod
-    def step(self, offset: int = 1) -> List[Optional[Job]]:
+    def step(self, offset: int = 1) -> list[Job | None]:
         """Steps the workload generator by :param offset:.
 
         This may, or may not, return new jobs, depending on the internal
@@ -28,9 +24,9 @@ class WorkloadGenerator(ABC):
         """
 
     @abstractmethod
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the length of the workload. Zero if unbounded."""
 
     @abstractmethod
-    def peek(self):
+    def peek(self) -> Job | None:
         """Peeks what would be the next job"""

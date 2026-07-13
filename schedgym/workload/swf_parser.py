@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """
 swf_parser - Parser for the Standard Workload Format (SWF)
 
@@ -66,12 +63,12 @@ def parse(
 
     max_procs: int = 0
     max_nodes: int = 0
-    with open(filename, 'r') as fp:  # pylint: disable=C
+    with open(filename, "r") as fp:  # pylint: disable=C
         for line in fp:
-            if line.startswith(';'):
-                if line.startswith('; MaxNodes:'):
+            if line.startswith(";"):
+                if line.startswith("; MaxNodes:"):
                     max_nodes = parse_int(line)
-                elif line.startswith('; MaxProcs:'):
+                elif line.startswith("; MaxProcs:"):
                     max_procs = parse_int(line)
                 continue
 

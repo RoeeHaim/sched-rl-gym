@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """cluster - Classes for cluster management
 
 The workhorse of this module is the :class:`schedgym.cluster.Cluster` class,
@@ -8,15 +5,19 @@ which manages resources in a cluster.
 """
 
 import copy
-from typing import Tuple, Iterable, Optional
+from collections.abc import Iterable
+from typing import Protocol, cast
 
 from . import pool
 
 from .job import Job, Resource
 from .event import JobEvent, EventType
 
-# pylint: disable=C
-RESOURCE_TYPE = Tuple[Iterable[pool.Interval], Iterable[pool.Interval]]
+RESOURCE_TYPE = tuple[Iterable[pool.Interval], Iterable[pool.Interval]]
+
+
+class _EventWindowIterable(Protocol):
+    def events_between(self, start: int, end: int) -> Iterable[JobEvent]: ...
 
 
 class Cluster:
@@ -48,9 +49,9 @@ class Cluster:
             The amount of memory in this cluster
         ignore_memory : bool
             Whether memory should be considered for decisions or not
-        used_processors : Optional[Resource]
+        used_processors : Resource | None
             Processors already in use in this cluster
-        used_memory : Optional[Resource]
+        used_memory : Resource | None
             Amount of memory already used in this cluster
     """
 
@@ -63,19 +64,19 @@ class Cluster:
         processors: int,
         memory: int,
         ignore_memory: bool = False,
-        used_processors: Optional[Resource] = None,
-        used_memory: Optional[Resource] = None,
+        used_processors: Resource | None = None,
+        used_memory: Resource | None = None,
     ):
         self.ignore_memory = ignore_memory
-        self.memory = pool.ResourcePool(
-            pool.ResourceType.MEMORY, memory, used_memory
-        )
+        self.memory = pool.ResourcePool(pool.ResourceType.MEMORY, memory, used_memory)
         self.processors = pool.ResourcePool(
             pool.ResourceType.CPU, processors, used_processors
         )
+        self._dirty: bool = True
+        self._cached_state: tuple | None = None
 
     @property
-    def free_resources(self) -> Tuple[int, int]:
+    def free_resources(self) -> tuple[int, int]:
         """The set of resources *not* in use in this cluster."""
         return self.processors.free_resources, self.memory.free_resources
 
@@ -104,15 +105,20 @@ class Cluster:
                 The job to allocate resources to.
         """
         if not self.fits(job):
-            raise AssertionError(
-                f'Unable to allocate resources for {job} in {self}'
-            )
+            raise AssertionError(f"Unable to allocate resources for {job} in {self}")
         self.processors.allocate(job.resources.processors)
         self.memory.allocate(job.resources.memory)
+        self._dirty = True
 
     def clone(self):
         """Clones this Cluster (duplicating it in memory)."""
-        return copy.deepcopy(self)
+        return Cluster(
+            self.processors.size,
+            self.memory.size,
+            self.ignore_memory,
+            copy.copy(self.processors.used_pool),
+            copy.copy(self.memory.used_pool),
+        )
 
     def find(self, job: Job) -> Resource:
         """Finds resources for a job.
@@ -145,6 +151,7 @@ class Cluster:
         self.processors.free(job.resources.processors)
         if not self.ignore_memory:
             self.memory.free(job.resources.memory)
+        self._dirty = True
 
     def find_resources_at_time(
         self, time: int, job: Job, events: Iterable[JobEvent]
@@ -174,15 +181,41 @@ class Cluster:
             an empty set of resources otherwise. (See
             :func:`schedgym.cluster.Cluster.find`.)
         """
-        def valid(e, time):
-            return time + 1 <= e.time < job.requested_time + time
+        window_end = time + job.requested_time
+        event_queue = (
+            cast(_EventWindowIterable, events)
+            if hasattr(events, "events_between")
+            else None
+        )
+        if event_queue is not None:
+            relevant_events = event_queue.events_between(time, window_end)
+        else:
+            relevant_events = (
+                e
+                for e in events
+                if time <= e.time < window_end and e.type == EventType.JOB_START
+            )
+
+        if self.ignore_memory:
+            used_processors = copy.copy(self.processors.used_pool)
+            for event in relevant_events:
+                if event.type != EventType.JOB_START:
+                    continue
+                for interval in event.processors:
+                    used_processors.add(interval)
+            used_processors.merge_overlaps()
+            return Cluster(
+                self.processors.size,
+                self.memory.size,
+                True,
+                used_processors,
+                None,
+            ).find(job)
 
         used = Resource(self.processors.used_pool, self.memory.used_pool)
-        for event in (
-            e
-            for e in events
-            if (valid(e, time) and e.type == EventType.JOB_START)
-        ):
+        for event in relevant_events:
+            if event.type != EventType.JOB_START:
+                continue
             for i in event.processors:
                 used.processors.add(i)
             for i in event.memory:
@@ -198,13 +231,15 @@ class Cluster:
         ).find(job)
 
     @property
-    def state(self) -> Tuple[Tuple[int, int, dict], ...]:
+    def state(self) -> tuple[tuple[int, int, dict], ...]:
         """Gets the current state of the cluster as numpy arrays.
 
         Returns:
             Tuple: a pair containing the number of processors used and the
             memory used and the jobs that are using such resources.
         """
+        if not self._dirty and self._cached_state is not None:
+            return self._cached_state
         processors = (
             self.processors.free_resources,
             self.processors.used_resources,
@@ -216,22 +251,20 @@ class Cluster:
             {(i.begin, i.end): i.data for i in self.memory.used_pool},
         )
         if self.ignore_memory:
-            return (processors,)
+            result = (processors,)
         else:
-            return processors, memory
+            result = processors, memory
+        self._cached_state = result
+        self._dirty = False
+        return self._cached_state
 
     def __bool__(self):
-        return (
-            self.processors.free_resources != 0
-            and self.memory.free_resources != 0
-        )
+        if self.ignore_memory:
+            return self.processors.free_resources != 0
+        return self.processors.free_resources != 0 and self.memory.free_resources != 0
 
     def __repr__(self):
-        return (
-            f'Cluster({self.processors}, {self.memory}, {self.ignore_memory})'
-        )
+        return f"Cluster({self.processors}, {self.memory}, {self.ignore_memory})"
 
     def __str__(self):
-        return (
-            f'Cluster({self.processors}, {self.memory}, {self.ignore_memory})'
-        )
+        return f"Cluster({self.processors}, {self.memory}, {self.ignore_memory})"

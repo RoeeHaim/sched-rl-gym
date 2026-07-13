@@ -1,11 +1,5 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-from __future__ import annotations, division
-
 import numpy as np
-import gym.spaces.box
-import gym.spaces.discrete
+import gymnasium.spaces
 
 from ..job import Job
 from .base import BaseRmEnv
@@ -29,24 +23,24 @@ NEW_JOB_RATE = 0.7
 SMALL_JOB_CHANCE = 0.8
 
 DEFAULT_WORKLOAD = {
-    'type': 'deeprm',
-    'new_job_rate': NEW_JOB_RATE,
-    'max_job_size': MAXIMUM_JOB_SIZE,
-    'max_job_len': MAXIMUM_JOB_LENGTH,
-    'small_job_chance': SMALL_JOB_CHANCE,
+    "type": "deeprm",
+    "new_job_rate": NEW_JOB_RATE,
+    "max_job_size": MAXIMUM_JOB_SIZE,
+    "max_job_len": MAXIMUM_JOB_LENGTH,
+    "small_job_chance": SMALL_JOB_CHANCE,
 }
 
 
 class CompactRmEnv(BaseRmEnv):
-    metadata = {'render.modes': ['human', 'rgb_array']}
+    metadata = {"render_modes": ["human", "rgb_array"]}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.memory = kwargs.get('memory', AMOUNT_OF_MEMORY)
-        self.processors = kwargs.get('processors', NUMBER_OF_PROCESSORS)
+        self.memory = kwargs.get("memory", AMOUNT_OF_MEMORY)
+        self.processors = kwargs.get("processors", NUMBER_OF_PROCESSORS)
 
-        self.renderer = kwargs.get('renderer', None)
+        self.renderer = kwargs.get("renderer", None)
 
         self.maximum_work = self.processors
         self.maximum_work_mem = self.memory
@@ -54,16 +48,16 @@ class CompactRmEnv(BaseRmEnv):
         self._setup_spaces()
 
     def _setup_spaces(self):
-        self.action_space = gym.spaces.discrete.Discrete(self.job_slots + 1)
+        self.action_space = gymnasium.spaces.Discrete(self.job_slots + 1)
 
-        self.observation_space = gym.spaces.box.Box(
+        self.observation_space = gymnasium.spaces.Box(
             low=0.0, high=1.0, shape=((len(self.state),)), dtype=np.float32
         )
 
-    def reset(self) -> np.ndarray:
+    def reset(self, *, seed=None, options=None) -> tuple[np.ndarray, dict]:
         self.maximum_work = np.log(self.time_limit) * self.processors
         self.maximum_work_mem = np.log(self.time_limit) * self.memory
-        return super().reset()
+        return super().reset(seed=seed, options=options)
 
     def really_done(self) -> bool:
         return (
@@ -103,18 +97,11 @@ class CompactRmEnv(BaseRmEnv):
             rewards = [self.compute_reward(js) for js in intermediate]
             if len(rewards) > 1:
                 rewards[0] = 0
-            reward = (
-                self.gamma ** np.arange(len(intermediate))
-            ).dot(rewards)
+            reward = (self.gamma ** np.arange(len(intermediate))).dot(rewards)
 
-        assert reward <= 0, (rewards, reward)
+        assert reward <= 0, reward
 
-        return (
-            self.state,
-            reward,
-            done,
-            self.stats if done else {}
-        )
+        return (self.state, reward, done, False, self.stats if done else {})
 
     @property
     def state(self):

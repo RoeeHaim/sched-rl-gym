@@ -1,32 +1,25 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """scheduler - Module with basic scheduling functionality.
 
 This is the core of the simulator, since this module contains functionality
 that interacts with all other components.
 """
 
+import copy
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import (
-    List,
-    Iterable,
-    Tuple,
-    Dict,
-    Any,
-    Union,
-    NamedTuple,
-    Optional,
-)
-
-import collections.abc
-
-import numpy as np
+from collections.abc import Iterable
+from typing import Any, NamedTuple
 
 from schedgym.cluster import Cluster
 from schedgym.job import Job, JobState, JobStatus, Resource
 from schedgym.event import JobEvent, EventType, EventQueue
+from schedgym.scheduler._bitmask_timeline import (
+    _intervaltree_to_bitmask,
+    build_timeline,
+    find_earliest_fit,
+    bitmask_to_resource,
+    select_lowest_bits,
+)
 
 
 class Stats(NamedTuple):
@@ -71,19 +64,21 @@ class Scheduler(ABC):
     current_time: int
     total_memory: int
     used_processors: int
+    requested_processors_in_system: int
+    completed_slowdown_sum: float
+    completed_bounded_slowdown_sum: float
+    completed_makespan: int
     need_schedule_call: bool
     number_of_processors: int
-    queue_waiting: List[Job]
-    queue_running: List[Job]
-    queue_admission: List[Job]
-    queue_completed: List[Job]
+    queue_waiting: list[Job]
+    queue_running: list[Job]
+    queue_admission: list[Job]
+    queue_completed: list[Job]
     cluster: Cluster
     job_events: EventQueue[JobEvent]
-    stats: Dict[int, Stats]
+    stats: dict[int, Stats]
 
-    def __init__(
-        self, number_of_processors, total_memory, ignore_memory=False
-    ):
+    def __init__(self, number_of_processors, total_memory, ignore_memory=False):
         self.number_of_processors = number_of_processors
         self.total_memory = total_memory
 
@@ -96,16 +91,19 @@ class Scheduler(ABC):
         self.used_memory = 0
         self.current_time = 0
         self.used_processors = 0
+        self.requested_processors_in_system = 0
+        self.completed_slowdown_sum = 0.0
+        self.completed_bounded_slowdown_sum = 0.0
+        self.completed_makespan = 0
         self.ignore_memory = ignore_memory
         self.job_events = EventQueue(self.current_time - 1)
-        self.cluster = Cluster(
-            number_of_processors, total_memory, ignore_memory
-        )
+        self.cluster = Cluster(number_of_processors, total_memory, ignore_memory)
         self.need_schedule_call = False
-        'Tracks whether we might need to schedule jobs'
+        # Tracks whether we might need to schedule jobs
+        self._queued_work_total: int = 0
 
     @property
-    def all_jobs(self) -> List[Job]:
+    def all_jobs(self) -> list[Job]:
         """Returns a list of all the jobs that ever got into the system"""
         return (
             self.queue_completed
@@ -115,19 +113,19 @@ class Scheduler(ABC):
         )
 
     @property
-    def slowdown(self) -> List[float]:
+    def slowdown(self) -> list[float]:
         """Returns the slowdown of all completed jobs"""
         return [j.slowdown for j in self.queue_completed]
 
     @property
-    def jobs_in_system(self) -> List[Job]:
+    def jobs_in_system(self) -> list[Job]:
         """Returns a list with all the jobs that haven't completed yet"""
         return self.queue_running + self.queue_waiting + self.queue_admission
 
     @property
     def makespan(self) -> int:
         """Computes the makespan of all finished jobs"""
-        return max([0] + [j.finish_time for j in self.queue_completed])
+        return self.completed_makespan
 
     @property
     def load(self) -> float:
@@ -136,10 +134,7 @@ class Scheduler(ABC):
         The load is the ratio between the number of requested processors and
         the number of processors in the system.
         """
-        requested_processors = sum(
-            [j.requested_processors for j in self.jobs_in_system]
-        )
-        return requested_processors / self.number_of_processors
+        return self.requested_processors_in_system / self.number_of_processors
 
     @property
     def utilization(self) -> float:
@@ -147,7 +142,7 @@ class Scheduler(ABC):
         return self.used_processors / self.number_of_processors
 
     @property
-    def bounded_slowdown(self) -> List[float]:
+    def bounded_slowdown(self) -> list[float]:
         """Computes the bounded slowdown for all completed jobs"""
         return [j.bounded_slowdown for j in self.queue_completed]
 
@@ -182,10 +177,12 @@ class Scheduler(ABC):
         j.finish_time = j.start_time + j.execution_time
         self.used_memory -= j.memory_use
         self.used_processors -= j.processors_allocated
+        self.requested_processors_in_system -= j.requested_processors
+        self.completed_makespan = max(self.completed_makespan, j.finish_time)
+        self.completed_slowdown_sum += j.slowdown
+        self.completed_bounded_slowdown_sum += j.bounded_slowdown
 
-    def _add_job_events(
-        self, job: Job, time: int
-    ) -> Tuple[JobEvent, JobEvent]:
+    def _add_job_events(self, job: Job, time: int) -> tuple[JobEvent, JobEvent]:
         """Adds start and finish events for a job to the current events.
 
         Parameters
@@ -197,9 +194,9 @@ class Scheduler(ABC):
         """
         if not job.resources or not job.proper:
             raise AssertionError(
-                'Malformed job submitted either with no processors, '
-                'or with insufficient number of '
-                'processors'
+                "Malformed job submitted either with no processors, "
+                "or with insufficient number of "
+                "processors"
             )
         start = JobEvent(time, EventType.JOB_START, job)
         finish = start.clone()
@@ -211,14 +208,14 @@ class Scheduler(ABC):
         return start, finish
 
     @property
-    def free_resources(self) -> Tuple[int, int]:
+    def free_resources(self) -> tuple[int, int]:
         """Returns the amount of free resources in the system."""
         return (
             self.number_of_processors - self.used_processors,
             self.total_memory - self.used_memory,
         )
 
-    def step(self, offset: int = None) -> bool:
+    def step(self, offset: int | None = None) -> bool:
         """Steps the simulation
 
         Parameters
@@ -229,7 +226,7 @@ class Scheduler(ABC):
         if offset is None:
             offset = 1
         if offset < 0:
-            raise AssertionError('Tried to move backwards in time')
+            raise AssertionError("Tried to move backwards in time")
 
         scheduled = False
         for _ in range(offset):
@@ -242,11 +239,25 @@ class Scheduler(ABC):
                 scheduled = True
                 self.schedule()
             present = self.job_events.step(1)
-            self.cluster = self.play_events(
-                present, self.cluster, update_queues=True
-            )
+            self.cluster = self.play_events(present, self.cluster, update_queues=True)
             self.current_time += 1
         return scheduled
+
+    def replay_advance_to(self, time: int) -> int:
+        if time < self.current_time:
+            raise AssertionError("Tried to move backwards in replay")
+        delta = time - self.job_events.time
+        if delta < 0:
+            raise AssertionError("Tried to replay before event queue time")
+        present = self.job_events.step(delta)
+        present = list(present)
+        self.cluster = self.play_events(present, self.cluster, update_queues=True)
+        self.current_time = max(self.current_time, time)
+        return len(present)
+
+    def replay_schedule(self) -> None:
+        self.need_schedule_call = False
+        self.schedule()
 
     def play_events(
         self,
@@ -290,7 +301,7 @@ class Scheduler(ABC):
                     self._complete_job(event.job)
                     self.update_stats()
             else:
-                raise RuntimeError('Unexpected event type found')
+                raise RuntimeError("Unexpected event type found")
         return cluster
 
     @staticmethod
@@ -321,9 +332,7 @@ class Scheduler(ABC):
     def some_job_fits(self, job_slots: slice = slice(0, None)):
         """Checks whether any jobs in the admission queue fits _right now_."""
 
-        return any(
-            [self.cluster.fits(j) for j in self.queue_admission[job_slots]]
-        )
+        return any([self.cluster.fits(j) for j in self.queue_admission[job_slots]])
 
     def can_schedule_now(self, job: Job) -> Resource:
         """Checks whether a job can be scheduled in the current cluster now.
@@ -331,23 +340,69 @@ class Scheduler(ABC):
         This is a special case of :func:`fits` in which we're operating right
         now with the current cluster.
 
+        Uses a bitmask fast-path that avoids ``Cluster.clone()`` and event
+        replay.  By the time this is called, ``self.cluster`` already reflects
+        all events up to ``current_time`` (``step()`` calls ``play_events()``
+        first), so only future JOB_START events in the job's time window need
+        to be considered.
+
         Parameters
         ----------
             job : Job
                 The job to check.
         """
-        cluster = self.cluster.clone()
-        events = filter(lambda e: e.time <= self.current_time, self.job_events)
-        for event in events:
-            if event.type == EventType.JOB_START:
-                cluster.allocate(event.job)
-            elif event.type == EventType.JOB_FINISH:
-                cluster.free(event.job)
-        return cluster.find_resources_at_time(
-            self.current_time, job, self.job_events
-        )
+        # schedule() is called before job_events.step(), so events AT current_time
+        # have not been applied to self.cluster yet.  We must apply them manually:
+        # - JOB_FINISH at current_time: these jobs are done, release their processors
+        # - JOB_START at current_time: these jobs just started, occupy their processors
+        # Then OR in JOB_START events in (current_time, current_time + requested_time).
+        occupied = _intervaltree_to_bitmask(self.cluster.processors.used_pool)
 
-    def find_first_time_for(self, job: Job) -> Tuple[int, Resource]:
+        for ev in self.job_events.events_between(
+            self.current_time, self.current_time + job.requested_time
+        ):
+            if ev.type == EventType.JOB_START:
+                occupied |= _intervaltree_to_bitmask(ev.job.resources.processors)
+            elif ev.type == EventType.JOB_FINISH and ev.time == self.current_time:
+                occupied &= ~_intervaltree_to_bitmask(ev.job.resources.processors)
+
+        # Check: do we have enough free processors?
+        full_mask = (1 << self.number_of_processors) - 1
+        free_mask = full_mask & ~occupied
+        if free_mask.bit_count() < job.requested_processors:
+            return Resource()
+
+        # Memory check (when ignore_memory=False)
+        if not self.ignore_memory and job.requested_memory > 0:
+            current_used_memory = sum(
+                iv.end - iv.begin for iv in self.cluster.memory.used_pool
+            )
+            for ev in self.job_events.events_between(
+                self.current_time, self.current_time + job.requested_time
+            ):
+                if ev.type == EventType.JOB_START:
+                    current_used_memory += ev.job.resources.measure()[1]
+                elif ev.type == EventType.JOB_FINISH and ev.time == self.current_time:
+                    current_used_memory -= ev.job.resources.measure()[1]
+            if self.cluster.memory.size - current_used_memory < job.requested_memory:
+                return Resource()
+
+        # Allocate lowest processors
+        allocated_mask = select_lowest_bits(free_mask, job.requested_processors)
+
+        # Build resource with memory if needed
+        if not self.ignore_memory and job.requested_memory > 0:
+            memory_pool = copy.copy(self.cluster.memory.used_pool)
+            return bitmask_to_resource(
+                allocated_mask,
+                job.id,
+                memory_amount=job.requested_memory,
+                total_memory=self.cluster.memory.size,
+                memory_used_pool=memory_pool,
+            )
+        return bitmask_to_resource(allocated_mask, job.id)
+
+    def find_first_time_for(self, job: Job) -> tuple[int, Resource]:
         """Finds the first time stamp on which we can start a job.
 
         Parameters
@@ -355,34 +410,61 @@ class Scheduler(ABC):
             job : Job
                 The job to find a time for
         """
+        future_by_time, future_times = self.job_events.future_events_snapshot()
 
-        if (not self.job_events.next) or (
-            self.job_events.next.time > self.current_time
-        ):
-            resources = self.cluster.find_resources_at_time(
-                self.current_time, job, self.job_events
-            )
-            if resources:
-                return self.current_time, resources
+        base_memory_pool = None
+        total_memory = 0
+        if not self.ignore_memory:
+            base_memory_pool = copy.copy(self.cluster.memory.used_pool)
+            total_memory = self.cluster.memory.size
 
-        near_future: Dict[int, List[JobEvent]] = defaultdict(list)
-        for e in self.job_events:
-            near_future[e.time].append(e)
-
-        cluster = self.cluster.clone()
-        for time in sorted(near_future):
-            cluster = self.play_events(near_future[time], cluster)
-            resources = cluster.find_resources_at_time(
-                time, job, self.job_events
-            )
-            if resources:
-                return time, resources
-
-        raise AssertionError(
-            'Failed to find time for job, even in the far future.'
+        timeline = build_timeline(
+            self.current_time,
+            self.number_of_processors,
+            self.cluster.processors.used_pool,
+            future_by_time,
+            future_times,
+            used_memory_pool=base_memory_pool if not self.ignore_memory else None,
+            total_memory=total_memory,
         )
 
-    def submit(self, job: Union[Job, Iterable[Optional[Job]]]) -> None:
+        start_time, allocated_mask = find_earliest_fit(
+            timeline, job, ignore_memory=self.ignore_memory
+        )
+
+        if not self.ignore_memory and base_memory_pool is not None:
+            memory_pool_at_start = copy.copy(base_memory_pool)
+
+            for t in sorted(future_by_time.keys()):
+                if t > start_time:
+                    break
+                for ev in future_by_time[t]:
+                    if ev.type == EventType.JOB_FINISH:
+                        for iv in ev.job.resources.memory:
+                            try:
+                                memory_pool_at_start.chop(iv.begin, iv.end)
+                            except Exception:
+                                pass
+                    elif ev.type == EventType.JOB_START and t < start_time:
+                        for iv in ev.job.resources.memory:
+                            memory_pool_at_start.add(iv)
+        else:
+            memory_pool_at_start = None
+
+        resources = bitmask_to_resource(
+            allocated_mask,
+            job.id,
+            memory_amount=job.requested_memory if not self.ignore_memory else 0,
+            total_memory=total_memory,
+            memory_used_pool=memory_pool_at_start,
+        )
+
+        if not resources:
+            raise AssertionError("Failed to find time for job, even in the far future.")
+
+        return start_time, resources
+
+    def submit(self, job: Job | Iterable[Job | None]) -> None:
         """Submits a new job to the system.
 
         Parameters
@@ -392,14 +474,14 @@ class Scheduler(ABC):
                 a sequence, all jobs in the sequence are submitted at the same
                 time.
         """
-        if isinstance(job, collections.abc.Iterable):
+        self.need_schedule_call = True
+        if isinstance(job, Iterable):
             for j in job:
                 self._submit(j)
         else:
             self._submit(job)
-        self.need_schedule_call = True
 
-    def _submit(self, job: Optional[Job]) -> None:
+    def _submit(self, job: Job | None) -> None:
         """Internal implementation of job submission.
 
         Adds the new job to the `submission_queue` and sets job status to
@@ -410,23 +492,20 @@ class Scheduler(ABC):
 
         if job.requested_processors > self.number_of_processors:
             raise RuntimeError(
-                'Impossible to allocate resources for job bigger than cluster.'
+                "Impossible to allocate resources for job bigger than cluster."
             )
         job.submission_time = self.current_time
         job.status = JobStatus.SUBMITTED
 
         # Compute statistics to be used in state representation {{{
         job.queue_size = len(self.queue_admission)
-        job.queued_work = sum(
-            [
-                j.requested_time * j.requested_processors
-                for j in self.queue_admission
-            ]
-        )
-        job.free_processors = self.cluster.state[0][0]
+        job.queued_work = self._queued_work_total
+        job.free_processors = self.cluster.processors.free_resources
         # }}}
 
         self.queue_admission.append(job)
+        self._queued_work_total += job.requested_time * job.requested_processors
+        self.requested_processors_in_system += job.requested_processors
 
     def state(self, timesteps: int, job_slots: int, smdp: bool = False):
         """Returns the current state of the cluster as viewed by the scheduler.
@@ -451,7 +530,7 @@ class Scheduler(ABC):
                 not time
         """
         # Gets all events between now and `timesteps` {{{
-        near_future: Dict[int, List[JobEvent]] = defaultdict(list)
+        near_future: dict[int, list[JobEvent]] = defaultdict(list)
         if smdp:
             last_time = 0
             for e in self.job_events:
@@ -462,16 +541,19 @@ class Scheduler(ABC):
                 if len(near_future) > timesteps:
                     break
             if len(near_future) < timesteps:
-                for i in range(last_time + 1, last_time + 1 + timesteps - len(near_future)):
+                for i in range(
+                    last_time + 1, last_time + 1 + timesteps - len(near_future)
+                ):
                     near_future[last_time + i].append([])  # type: ignore
             elif len(near_future) > timesteps:
                 near_future = {
-                    k: v for i, (k, v) in enumerate(near_future.items()) if i < timesteps
+                    k: v
+                    for i, (k, v) in enumerate(near_future.items())
+                    if i < timesteps
                 }
         else:
-            for e in filter(
-                lambda e: e.time < self.current_time + timesteps + 1,
-                self.job_events
+            for e in self.job_events.events_between(
+                self.current_time, self.current_time + timesteps
             ):
                 near_future[e.time - self.current_time].append(e)
         # }}}
@@ -489,11 +571,7 @@ class Scheduler(ABC):
         # }}}
 
         # Gets the representation of jobs in `job_slots` {{{
-        jobs = [
-            j.state
-            for i, j in enumerate(self.queue_admission)
-            if i < job_slots
-        ]
+        jobs = [j.state for i, j in enumerate(self.queue_admission) if i < job_slots]
         for i, job in enumerate(self.queue_admission):
             if i >= job_slots:
                 break
@@ -511,9 +589,7 @@ class Scheduler(ABC):
 
         return state, jobs, backlog
 
-    def assign_schedule(
-        self, job, resources, time
-    ) -> Tuple[JobEvent, JobEvent]:
+    def assign_schedule(self, job, resources, time) -> tuple[JobEvent, JobEvent]:
         """Assigns a schedule to a job.
 
         What this means is that the job is removed from the admission queue
@@ -547,10 +623,13 @@ class Scheduler(ABC):
 
         Statistics are only computed when job events happen in the cluster.
         """
+        completed_jobs = len(self.queue_completed)
         self.stats[self.current_time] = Stats(
             self.utilization,
             self.load,
-            np.mean(self.slowdown) if self.queue_completed else 0.0,
+            self.completed_slowdown_sum / completed_jobs if completed_jobs else 0.0,
             self.makespan,
-            np.mean(self.bounded_slowdown) if self.queue_completed else 0.0,
+            self.completed_bounded_slowdown_sum / completed_jobs
+            if completed_jobs
+            else 0.0,
         )

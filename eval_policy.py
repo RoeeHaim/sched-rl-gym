@@ -8,7 +8,7 @@ Usage: python eval_policy.py <checkpoint.pth> [--episodes N]
 import argparse
 from collections import OrderedDict
 
-import gym
+import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
@@ -57,7 +57,7 @@ def main():
 
     # The RL policy sees the flattened image state (use_raw_state=False),
     # while the heuristics use the raw state tuple.
-    policy_env = gym.make('DeepRM-v0')
+    policy_env = gym.make('DeepRM-v0').unwrapped
     model = PGNet(policy_env)
     model.load_state_dict(torch.load(args.checkpoint, map_location='cpu'))
     model.eval()
@@ -66,7 +66,7 @@ def main():
     results = {}
 
     for name, policy in agents.items():
-        env = gym.make('DeepRM-v0', use_raw_state=True)
+        env = gym.make('DeepRM-v0', use_raw_state=True).unwrapped
         env.seed(args.seed)
         np.random.seed(args.seed)
         vals = [run_episode(env, policy, args.max_episode_length)

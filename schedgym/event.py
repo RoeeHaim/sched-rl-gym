@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """event - Event Handling classes
 
 We have a basic Event type, which is specialized by
@@ -11,16 +8,23 @@ We have a basic Event type, which is specialized by
 import copy
 import enum
 import warnings
-from typing import List, Optional, Iterable, TypeVar, Generic, Iterator
+from bisect import insort
+from typing import TypeVar, Generic
+from collections.abc import Iterable, Iterator
 
-from intervaltree import Interval
+try:
+    from ._schedgym_rs import Interval
+except ImportError:
+    from intervaltree import Interval
 
 from .job import Job
 from .heap import Heap
 from .pool import ResourceType
 
-T = TypeVar('T', bound='Event')  # pylint: disable=C
-'Generic type for type annotations'
+T = TypeVar("T", bound="Event")  # pylint: disable=C
+"Generic type for type annotations"
+
+_PAST_LIMIT = 1000
 
 
 class EventType(enum.IntEnum):
@@ -120,7 +124,7 @@ class JobEvent(Event):
         return self.job.resources.memory
 
     def __str__(self):
-        return f'JobEvent<{self.time}, {self.type.name}, {self.job}>'
+        return f"JobEvent<{self.time}, {self.type.name}, {self.job}>"
 
     def __repr__(self):
         return str(self)
@@ -136,13 +140,35 @@ class EventQueue(Generic[T]):
     """
 
     time: int
-    past: List[T]
+    past: list[T]
     future: Heap[T]
 
     def __init__(self, time: int = 0):
         self.past = []
         self.time = time
         self.future = Heap()
+        self._future_by_time: dict[int, list[T]] = {}
+        self._future_times: list[int] = []
+
+    def _track_future_event(self, event: T) -> None:
+        bucket = self._future_by_time.get(event.time)
+        if bucket is None:
+            self._future_by_time[event.time] = [event]
+            insort(self._future_times, event.time)
+        else:
+            index = len(bucket)
+            while index > 0 and bucket[index - 1].type > event.type:
+                index -= 1
+            bucket.insert(index, event)
+
+    def _untrack_future_event(self, event: T) -> None:
+        bucket = self._future_by_time.get(event.time)
+        if bucket is None:
+            return
+        bucket.remove(event)
+        if not bucket:
+            del self._future_by_time[event.time]
+            self._future_times.remove(event.time)
 
     def add(self, event: T) -> None:
         """Adds a new event to the priority queue.
@@ -154,13 +180,16 @@ class EventQueue(Generic[T]):
         """
         if event.time >= self.time:
             self.future.add(event, (event.time, event.type))
+            self._track_future_event(event)
         else:
             self.past.append(event)
             self.past.sort(key=lambda e: e.time)
+            if len(self.past) > _PAST_LIMIT:
+                self.past = self.past[-_PAST_LIMIT:]
             warnings.warn(
-                'Adding events to the past might change the '
-                'ordering of events that happened at the same '
-                'time.'
+                "Adding events to the past might change the "
+                "ordering of events that happened at the same "
+                "time."
             )
 
     def step(self, time: int = 1) -> Iterable[T]:
@@ -176,49 +205,68 @@ class EventQueue(Generic[T]):
             the current time.
         """
         if time < 0:
-            raise AssertionError('Tried to move into the past.')
+            raise AssertionError("Tried to move into the past.")
         self.time += time
-        present: List[T] = []
+        present: list[T] = []
         first = self.future.first
         while first and first.time <= self.time:
             current = self.future.pop()
+            self._untrack_future_event(current)
             present.append(current)
             self.past.append(current)
             first = self.future.first
+        if len(self.past) > _PAST_LIMIT:
+            self.past = self.past[-_PAST_LIMIT:]
         return present
 
-    def remove(self, event: Event) -> None:
+    def remove(self, event: T) -> None:
         """Removes an event from the queue.
 
         The event is required to not have happened yet, as removal of past
         events is not supported.
         """
         if event not in self.future:
-            raise ValueError('Tried to remove non-existant value')
+            raise ValueError("Tried to remove non-existant value")
         self.future.remove(event)
+        self._untrack_future_event(event)
 
     @property
-    def first(self) -> Optional[T]:  # XXX: This is probably not needed
+    def first(self) -> T | None:  # XXX: This is probably not needed
         """The first event in the future to happen in this queue."""
         return self.future.first
 
     @property
-    def next(self) -> Optional[T]:
+    def next(self) -> T | None:
         """The next event to happen in this queue."""
         if len(self.future) == 0:
             return None
         return self.future.first
 
     @property
-    def last(self) -> Optional[T]:
+    def last(self) -> T | None:
         """The last event to have happened in this queue."""
         return self.past[-1] if self.past else None
 
     def __iter__(self) -> Iterator[T]:
         return self.future.heapsort()
 
+    def future_events_snapshot(self) -> tuple[dict[int, list[T]], list[int]]:
+        """Read-only snapshot of future events grouped by time.
+
+        Returns the live internal structures — callers MUST NOT mutate them.
+        """
+        return self._future_by_time, self._future_times
+
+    def events_between(self, start: int, end: int) -> Iterator[T]:
+        for time in self._future_times:
+            if time < start:
+                continue
+            if time >= end:
+                break
+            yield from self._future_by_time[time]
+
     def __str__(self) -> str:
-        return f'{[e for e in self.future.heapsort()]}'
+        return f"{[e for e in self.future.heapsort()]}"
 
     def __repr__(self):
         return str(self)

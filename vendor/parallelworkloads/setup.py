@@ -2,47 +2,38 @@
 # -*- coding: utf-8 -*-
 
 """A setuptools based setup module.
+
 See:
 https://packaging.python.org/guides/distributing-packages-using-setuptools/
 https://github.com/pypa/sampleproject
 """
 
 # Always prefer setuptools over distutils
-from setuptools import setup, find_packages
-import pathlib
+from setuptools import setup, find_packages, Extension
+try:
+    from Cython.Build import cythonize
+except (NameError, ModuleNotFoundError):
+    def cythonize(*args, **kwargs):
+        pass
+try:
+    import pathlib
+except NameError:
+    import pathlib2 as pathlib
 
 here = pathlib.Path(__file__).parent.resolve()
 
 # Get the long description from the README file
 long_description = (here / 'README.rst').read_text(encoding='utf-8')
 
-extras = {
-    'render': [
-        'matplotlib',
-        'pyglet',
-    ],
-    'test': [
-        'pytest',
-        'coverage',
-    ],
-    'docs': [
-        'Sphinx',
-        'docutils',
-        'nbsphinx',
-    ]
-}
-
-extras['all'] = [item for group in extras.values() for item in group]
-
 # Arguments marked as "Required" below must be included for upload to PyPI.
 # Fields marked as "Optional" may be commented out.
 
 setup(
-    name='sched-rl-gym',
-    description='OpenAI Gym environment for HPC job scheduling',
+    name='parallelworkloads',
+    description='A Python Wrapper for the workload model proposed by Lublin',
     long_description=long_description,
     long_description_content_type='text/x-rst',
-    url='https://github.com/renatolfc/sched-rl-gym',
+    url='https://github.com/renatolfc/parallelworkloads',
     author='Renato L. de F. Cunha',
     author_email='renatocunha@acm.org',
 
@@ -67,29 +58,25 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3 :: Only',
     ],
 
-    keywords='gym, reinforcement learning, artificial intelligence',
+    ext_modules = cythonize([
+        Extension('parallelworkloads.swf', ['parallelworkloads/swf.pyx']),
+        Extension('parallelworkloads.lublin99', ['parallelworkloads/lublin99.pyx']),
+        Extension('parallelworkloads.tsafrir05', ['parallelworkloads/tsafrir05.pyx']),
+    ], language_level=3),
 
+    keywords='workload, standard workload format, swf',
+
+    package_dir={'parallelworkloads': 'parallelworkloads'},
     packages=find_packages(),
-
     python_requires='>=3.6, <4',
 
-    # This field lists other packages that your project depends on to run.
-    # Any package you put here will be installed by pip when your project is
-    # installed, so they must be valid existing projects.
-    #
-    # For an analysis of "install_requires" vs pip's requirements files see:
-    # https://packaging.python.org/en/latest/requirements.html
-    install_requires=[
-        'gym',
-        'numpy',
-        'intervaltree>=3.0',
-        'parallelworkloads',
-    ],
-
-    extras_require=extras,
+    extras_require={
+        'dev': ['cython'],
+    },
 
     # List additional URLs that are relevant to your project as a dict.
     #
@@ -101,8 +88,8 @@ setup(
     # maintainers, and where to support the project financially. The key is
     # what's used to render the link text on PyPI.
     project_urls={  # Optional
-        'Bug Reports': 'https://github.com/renatolfc/sched-rl-gym/issues',
+        'Bug Reports': 'https://github.com/renatolfc/parallelworkloads/issues',
         'Say Thanks!': 'https://saythanks.io/to/renatocunha%40acm.org',
-        'Source': 'https://github.com/renatolfc/sched-rl-gym',
+        'Source': 'https://github.com/renatolfc/parallelworkloads',
     },
 )

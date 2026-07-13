@@ -9,7 +9,7 @@ reward and average job slowdown).
 
 import argparse
 
-import gym
+import gymnasium as gym
 import numpy as np
 
 import schedgym.envs as deeprm  # noqa: F401 (registers DeepRM-v0)
@@ -44,12 +44,12 @@ AGENTS = {'sjf': sjf_action, 'random': random_action}
 
 
 def run_episode(env, policy, max_episode_length):
-    ob = env.reset()
+    ob, _ = env.reset()
     total_reward = 0.0
     for _ in range(max_episode_length):
-        ob, reward, done, _ = env.step(policy(ob))
+        ob, reward, terminated, truncated, _ = env.step(policy(ob))
         total_reward += reward
-        if done:
+        if terminated or truncated:
             break
     slowdowns = env.scheduler.slowdown
     return total_reward, np.mean(slowdowns) if slowdowns else np.nan
@@ -63,7 +63,7 @@ def main():
     args = parser.parse_args()
 
     for name, policy in AGENTS.items():
-        env = gym.make('DeepRM-v0', use_raw_state=True)
+        env = gym.make('DeepRM-v0', use_raw_state=True).unwrapped
         env.seed(args.seed)
         np.random.seed(args.seed)
         rewards, slowdowns = [], []
