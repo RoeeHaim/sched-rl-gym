@@ -94,3 +94,9 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[dependency-groups]
+rl = [
+    "tensorboard>=2.21.0",
+    "torch>=2.13.0",
+]

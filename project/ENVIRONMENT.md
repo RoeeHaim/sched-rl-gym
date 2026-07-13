@@ -1,51 +1,60 @@
-# Environment setup (Windows, Python 3.10)
+# Environment setup (modern stack: uv + gymnasium + Rust)
 
-These are the exact steps and version pins that produce a working environment on
-Windows. The order matters because of two legacy-dependency quirks (see notes).
+As of the merge with upstream/master (July 2026), the project uses the
+modernized toolchain: Python 3.13, gymnasium (not gym 0.21), `pyproject.toml`
+with [uv](https://docs.astral.sh/uv/) for dependency management, and a
+maturin/PyO3 Rust extension (`schedgym._schedgym_rs`) that accelerates the
+Heap / IntervalTree / ResourcePool hot paths (pure-Python fallbacks exist,
+but the build produces the Rust extension).
+
+## Prerequisites (one-time, per machine)
+
+- **uv** — `winget install astral-sh.uv`
+- **Rust toolchain** — `winget install Rustlang.Rustup` (stable-msvc)
+- **MSVC Build Tools** — required both for the Rust linker and for building
+  the Cython extensions of `parallelworkloads`
+- Python 3.13 (uv will find it, or download one; pinned in `.python-version`)
+
+## Setup
 
 ```powershell
 # from the repo root
-py -3.10 -m venv venv
-
-# build tools (setuptools < 66 is required to build gym 0.21)
-venv\Scripts\python.exe -m pip install "setuptools==65.5.0" "wheel==0.38.4" "Cython==3.2.3" "numpy==1.23.5"
-
-# parallelworkloads (Lublin99 / Tsafrir05 generators) — needs the rand48 POSIX
-# compatibility shim to compile under MSVC. Install from the patched source.
-venv\Scripts\python.exe -m pip install --no-build-isolation <path-to>\parallelworkloads
-
-# this package (editable) + test/base deps
-venv\Scripts\python.exe -m pip install --no-build-isolation -e . "intervaltree==3.0.2" "pytest==7.4.4" "pytest-cov==4.1.0" "coverage==7.14.1"
-
-# gym 0.21 has invalid metadata that modern pip rejects -> use pip < 24.1
-venv\Scripts\python.exe -m pip install "pip==23.3.2"
-venv\Scripts\python.exe -m pip install --no-build-isolation "gym==0.21.0"
-
-# deep RL training (CPU build)
-venv\Scripts\python.exe -m pip install "torch==2.12.0" --index-url https://download.pytorch.org/whl/cpu
-venv\Scripts\python.exe -m pip install "tensorboard==2.20.0"
+uv sync --extra test          # core + test deps, builds Rust ext + parallelworkloads
+uv sync --extra test --group rl   # add torch + tensorboard for training
 ```
+
+That's it. `uv sync` creates `.venv/`, builds the project (maturin/Rust) and
+`parallelworkloads` from the vendored source, and installs everything pinned
+by `uv.lock`.
 
 ## Notes / gotchas
 
-- **gym 0.21 needs `pip < 24.1`.** Newer pip refuses to install it
-  (`invalid metadata: ... opencv-python (>=3.)`). Pin pip to 23.3.2 first.
-- **gym 0.21, not 0.26.** `pip install -e .` may pull gym 0.26, whose API differs
-  (5-tuple `step`, tuple `reset`). The code targets the 0.21 API — keep 0.21.
-- **`setuptools==65.5.0`** (i.e. < 66) is required to build gym 0.21.
-- **`parallelworkloads`** does not build under MSVC without the rand48 POSIX shim
-  (`rand48_compat.h`). It is a separate package; a clean fork + upstream PR for the
-  shim is still pending.
-- **`pytest==7.4.4`**, not the 4.6.3 pinned upstream — 4.6.3 crashes on Python 3.10
-  (`required field "lineno" missing from alias`).
+- **parallelworkloads is vendored** under `vendor/parallelworkloads`. It is
+  upstream's source plus `rand48_compat.h` — a POSIX rand48 shim (guarded by
+  `#ifdef _WIN32/_MSC_VER`) without which the package does not compile under
+  MSVC. `[tool.uv.sources]` in `pyproject.toml` points at it. An upstream PR
+  for the shim is still pending; if it is ever merged, the source can be
+  switched back to the upstream git URL.
+- **gymnasium API**: `reset()` returns `(obs, info)` and takes `seed=`;
+  `step()` returns `(obs, reward, terminated, truncated, info)`. All envs,
+  tests and scripts in this repo were ported accordingly.
+- **CompactRmEnv observation bounds**: empty job slots are padded with -1
+  sentinels which the SMDP log transform maps to small negatives, and
+  log-scaled event time offsets can slightly exceed 1.0 — the declared Box
+  is therefore `low=-1.0, high=inf`. (This was always true numerically; the
+  old gym stack simply never checked.)
 - The SWF test (`TestSwfGenerator`) needs `test/LANL-CM5-1994-4.1-cln.swf.gz`
-  (a plain-text SWF trace despite the `.gz` name; the parser reads it as text).
-
-A frozen snapshot of the working environment is in `requirements-lock.txt`.
+  (a plain-text SWF trace despite the `.gz` name; the parser reads it as
+  text). It is committed in this repo.
+- The legacy setup (Python 3.10 / gym 0.21 / pip pins) is documented in the
+  git history of this file, and `project/requirements-lock.txt` remains the
+  frozen snapshot of that environment, should the old runs ever need to be
+  reproduced exactly.
 
 ## Verify
 
 ```powershell
-venv\Scripts\python.exe -m pytest schedgym\test_schedgym.py -q --no-cov   # 98 passed
-venv\Scripts\python.exe eval_baselines.py --episodes 3
+uv run pytest schedgym -q --no-cov        # 181 passed
+uv run python eval_baselines.py --episodes 3
+uv run python -c "import schedgym._schedgym_rs"   # Rust backend present
 ```

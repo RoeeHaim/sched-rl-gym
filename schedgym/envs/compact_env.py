@@ -50,8 +50,12 @@ class CompactRmEnv(BaseRmEnv):
     def _setup_spaces(self):
         self.action_space = gymnasium.spaces.Discrete(self.job_slots + 1)
 
+        # low is -1.0 because empty job slots are padded with -1 sentinels,
+        # which the log transform in _normalize_jobs maps to small negatives.
+        # high is unbounded because the log-scaled SMDP time offsets can
+        # slightly exceed 1.0 when events lie beyond the time limit.
         self.observation_space = gymnasium.spaces.Box(
-            low=0.0, high=1.0, shape=((len(self.state),)), dtype=np.float32
+            low=-1.0, high=np.inf, shape=((len(self.state),)), dtype=np.float32
         )
 
     def reset(self, *, seed=None, options=None) -> tuple[np.ndarray, dict]:

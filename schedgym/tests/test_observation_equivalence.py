@@ -74,12 +74,14 @@ def _assert_step_obs_valid(test_case, obs, expected_shape, label, ndim=None):
     test_case.assertFalse(np.any(np.isinf(flat)), msg=f"{label}: Inf detected")
 
 
-def _assert_reset_obs_in_range(test_case, obs, label):
+def _assert_reset_obs_in_range(test_case, obs, label, low=0.0, high=1.0):
     flat = np.asarray(obs).ravel()
     test_case.assertGreaterEqual(
-        float(flat.min()), 0.0, msg=f"{label}: reset obs min < 0"
+        float(flat.min()), low, msg=f"{label}: reset obs min < {low}"
     )
-    test_case.assertLessEqual(float(flat.max()), 1.0, msg=f"{label}: reset obs max > 1")
+    test_case.assertLessEqual(
+        float(flat.max()), high, msg=f"{label}: reset obs max > {high}"
+    )
 
 
 class TestObservationEquivalence(unittest.TestCase):
@@ -152,7 +154,10 @@ class TestObservationEquivalence(unittest.TestCase):
         env = _make_compact_env()
         observations = _collect_steps(env, n_steps=50, seed=3)
         expected_shape = env.observation_space.shape
-        _assert_reset_obs_in_range(self, observations[0], "reset")
+        # Empty job slots are padded with -1 sentinels, which the SMDP log
+        # transform maps to small negative values, hence low=-1.0; log-scaled
+        # time offsets may slightly exceed 1.0 for events beyond the limit.
+        _assert_reset_obs_in_range(self, observations[0], "reset", low=-1.0, high=2.0)
         for i, obs in enumerate(observations):
             _assert_step_obs_valid(self, obs, expected_shape, f"step {i}", ndim=1)
 

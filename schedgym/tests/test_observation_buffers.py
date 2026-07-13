@@ -66,7 +66,8 @@ class TestObservationBuffers(unittest.TestCase):
         env = self.make_deep_env()
         env.reset(seed=123)
         state, _, _ = env.scheduler.state(env.time_horizon, env.job_slots)
-        current = env.build_current_state(state)
+        # state[0] holds the SMDP event time offsets; resources start at 1.
+        current = env.build_current_state(state[1:])
         self.assertEqual(len(current), 2)
         self.assertTrue(all(isinstance(arr, np.ndarray) for arr in current))
         self.assertTrue(all(arr.shape == (env.time_horizon, 10) for arr in current))
@@ -101,5 +102,9 @@ class TestObservationBuffers(unittest.TestCase):
         self.assertEqual(state.ndim, 1)
         self.assertEqual(state.shape, env.observation_space.shape)
         self.assertEqual(len(state), env.observation_space.shape[0])
-        self.assertGreaterEqual(float(state.min()), 0.0)
-        self.assertLessEqual(float(state.max()), 1.0)
+        # Empty job slots are padded with -1 sentinels, which the SMDP log
+        # transform maps to small negative values; log-scaled time offsets
+        # may slightly exceed 1.0 for events beyond the time limit.
+        self.assertGreaterEqual(float(state.min()), -1.0)
+        self.assertTrue(np.all(np.isfinite(state)))
+        self.assertLessEqual(float(state.max()), 2.0)

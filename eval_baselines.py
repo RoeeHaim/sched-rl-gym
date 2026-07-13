@@ -15,9 +15,27 @@ import numpy as np
 import schedgym.envs as deeprm  # noqa: F401 (registers DeepRM-v0)
 
 
+def split_observation(observation):
+    """Groups the raw observation into (current, wait, backlog, time).
+
+    The raw state is a 6-tuple (processors and memory as separate arrays)
+    unless the env ignores memory, in which case it is a 4-tuple.
+    """
+    if len(observation) == 6:
+        c_procs, c_mem, w_procs, w_mem, backlog, time = observation
+        return (
+            np.stack((c_procs, c_mem)),
+            np.stack((w_procs, w_mem)),
+            backlog,
+            time,
+        )
+    current, wait, backlog, time = observation
+    return current[None], wait[None], backlog, time
+
+
 def sjf_action(observation):
     "Selects the job SJF (Shortest Job First) would select."
-    current, wait, _, _ = observation
+    current, wait, _, _ = split_observation(observation)
     best = wait.shape[2] + 1  # infinity
     best_idx = wait.shape[1]
 
@@ -36,7 +54,7 @@ def sjf_action(observation):
 
 
 def random_action(observation):
-    _, wait, _, _ = observation
+    _, wait, _, _ = split_observation(observation)
     return np.random.randint(0, wait.shape[1] + 1)
 
 

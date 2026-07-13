@@ -23,8 +23,10 @@ class TestEventsBetweenState(unittest.TestCase):
         state, jobs, backlog = self.scheduler.state(5, 4)
 
         self.assertIsInstance(state, list)
-        self.assertEqual(2, len(state))
+        # time offsets, processors, memory
+        self.assertEqual(3, len(state))
         self.assertEqual(5, len(state[0]))
+        self.assertEqual(5, len(state[1]))
         self.assertEqual(4, len(jobs))
         self.assertIsInstance(backlog, int)
 
