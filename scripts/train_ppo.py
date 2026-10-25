@@ -22,7 +22,7 @@ from pathlib import Path
 
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.callbacks import CheckpointCallback
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecMonitor, VecNormalize
 
 from ppo_utils import DEFAULT_CONFIG, make_env
 
@@ -47,6 +47,8 @@ def main():
     ap.add_argument("--batch-size", type=int, default=256)
     ap.add_argument("--ent-coef", type=float, default=0.01)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--no-norm-reward", action="store_true",
+                    help="disable reward normalization (rewards here reach hundreds per step)")
     ap.add_argument("--checkpoint-every", type=int, default=200_000, help="in total timesteps")
     ap.add_argument("--out", default=None, help="output folder (default models/ppo_<date>)")
     args = ap.parse_args()
@@ -65,6 +67,14 @@ def main():
 
     vec_cls = SubprocVecEnv if args.n_envs > 1 else DummyVecEnv
     envs = vec_cls([factory(i) for i in range(args.n_envs)])
+    # VecMonitor logs episode return/length (rollout/ep_rew_mean in TensorBoard).
+    envs = VecMonitor(envs)
+    # Rewards are -sum(1/execution_time) over jobs in the system, accumulated over
+    # the elapsed time, so a single 'wait' can be worth -400. Unscaled, the value
+    # loss swamps the policy loss and PPO collapses to 'always wait'. Only rewards
+    # are normalized (not observations), so evaluation needs no saved statistics.
+    if not args.no_norm_reward:
+        envs = VecNormalize(envs, norm_obs=False, norm_reward=True, gamma=args.gamma)
 
     model = MaskablePPO(
         "MlpPolicy", envs,
