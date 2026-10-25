@@ -125,8 +125,10 @@ class EventBasedDeepRmSimulator:
             return [[]]
 
         jobs: list[list[Job]] = []
-        self.current_time += 1
         while True:
+            # One iteration == one simulated time unit, so the clock must
+            # advance inside the loop to stay in sync with the scheduler.
+            self.current_time += 1
             j = self.workload.step()
             if j:
                 self.scheduler.submit(j)
