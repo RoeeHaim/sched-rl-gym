@@ -239,8 +239,10 @@ class CompactRmEnv(BaseRmEnv):
             time_left,
         )
 
-        # Ensure we return exactly self._state_buffer_size elements, we can pad with 0
-        return self._state_buffer[: self._state_buffer_size]
+        # Return a copy: the buffer is reused on every step, and callers (e.g. a
+        # trajectory or replay buffer) keep observations. Returning the buffer itself
+        # would make every stored observation alias the latest one.
+        return self._state_buffer[: self._state_buffer_size].copy()
 
     def _normalize_jobs(self, jobs):
         def _sumdiv(arr, idx, orig, limit):

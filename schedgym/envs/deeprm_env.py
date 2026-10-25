@@ -169,7 +169,8 @@ class DeepRmEnv(BaseRmEnv):
         self._obs_buffer[:, col : col + w] = backlog
         col += w
         self._obs_buffer[:, col : col + 1] = time
-        return self._obs_buffer
+        # Return a copy: the buffer is reused on every step (see CompactRmEnv.state).
+        return self._obs_buffer.copy()
 
     def find_slot_position(self, action):
         if action < len(self.scheduler.queue_admission):
