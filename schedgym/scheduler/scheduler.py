@@ -5,6 +5,7 @@ that interacts with all other components.
 """
 
 import copy
+import math
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Iterable
@@ -402,6 +403,38 @@ class Scheduler(ABC):
             )
         return bitmask_to_resource(allocated_mask, job.id)
 
+    def planned_events(
+        self, start: int, end: float = math.inf
+    ) -> tuple[dict[int, list[JobEvent]], list[int]]:
+        """Future events as a real scheduler would know them.
+
+        The event queue holds each job's *actual* finish time
+        (``start + min(execution_time, requested_time)``), which a real
+        scheduler cannot know in advance: it only knows the user's estimate.
+        Here every JOB_FINISH event is placed at its *planned* time,
+        ``job.start_time + job.requested_time``. When a job ends early, the
+        real event still fires at the actual time; only the forecast differs.
+        Finish events at the current time are kept as they are (they are
+        happening now, so the scheduler can see them).
+
+        Returns events grouped by planned time in ``[start, end)`` (finish
+        events before start events at the same time, as in the event queue)
+        and the sorted list of those times.
+        """
+        by_time: dict[int, list[JobEvent]] = defaultdict(list)
+        for e in self.job_events.events_between(start, math.inf):
+            t = e.time
+            # A job finishing *now* is observable, not a forecast: keep its
+            # actual time. Moving it would make the planner think its
+            # processors are still busy (and later free them under another job).
+            if e.type == EventType.JOB_FINISH and e.time > self.current_time:
+                t = e.job.start_time + e.job.requested_time
+            if t < end:
+                by_time[t].append(e)
+        for events in by_time.values():
+            events.sort(key=lambda e: e.type)
+        return by_time, sorted(by_time)
+
     def find_first_time_for(self, job: Job) -> tuple[int, Resource]:
         """Finds the first time stamp on which we can start a job.
 
@@ -410,7 +443,8 @@ class Scheduler(ABC):
             job : Job
                 The job to find a time for
         """
-        future_by_time, future_times = self.job_events.future_events_snapshot()
+        # Plan with requested (not actual) run times: see planned_events().
+        future_by_time, future_times = self.planned_events(self.current_time)
 
         base_memory_pool = None
         total_memory = 0
@@ -530,14 +564,15 @@ class Scheduler(ABC):
                 not time
         """
         # Gets all events between now and `timesteps` {{{
+        # Uses planned finish times (start + requested_time), never the actual
+        # run time, which the scheduler cannot know (see planned_events()).
         near_future: dict[int, list[JobEvent]] = defaultdict(list)
         if smdp:
             last_time = 0
-            for e in self.job_events:
-                if e.time < self.current_time:
-                    continue
-                last_time = e.time - self.current_time
-                near_future[last_time].append(e)
+            by_time, times = self.planned_events(self.current_time)
+            for t in times:
+                last_time = t - self.current_time
+                near_future[last_time].extend(by_time[t])
                 if len(near_future) > timesteps:
                     break
             if len(near_future) < timesteps:
@@ -552,10 +587,11 @@ class Scheduler(ABC):
                     if i < timesteps
                 }
         else:
-            for e in self.job_events.events_between(
+            by_time, times = self.planned_events(
                 self.current_time, self.current_time + timesteps
-            ):
-                near_future[e.time - self.current_time].append(e)
+            )
+            for t in times:
+                near_future[t - self.current_time].extend(by_time[t])
         # }}}
 
         # Gets the state representation of currently in use resources {{{

@@ -159,6 +159,81 @@ class TestHandcrafted(unittest.TestCase):
             s.submit(self._job(1, 5, 1))
 
 
+class TestNoFutureKnowledge(unittest.TestCase):
+    """Bug 3: the scheduler may only know requested run times, not actual ones.
+
+    Two runs that differ only in a running job's *actual* run time must look
+    identical to the scheduler until that job actually finishes.
+    """
+
+    @staticmethod
+    def _running(actual, requested=10, procs=6):
+        s = NullScheduler(10, 10, ignore_memory=True)
+        j = Job(1, 0, execution_time=actual, processors_allocated=procs,
+                requested_processors=procs, requested_time=requested)
+        j.requested_memory = 0
+        s.submit(j)
+        s.step(0)
+        s.forward_time()  # t=1, job running
+        return s
+
+    def test_state_does_not_reveal_actual_run_time(self):
+        for smdp, horizon in ((True, 4), (False, 12)):
+            with self.subTest(smdp=smdp):
+                a = self._running(actual=10).state(horizon, 5, smdp=smdp)[0]
+                b = self._running(actual=3).state(horizon, 5, smdp=smdp)[0]
+                self.assertEqual(a, b)
+
+    def test_easy_reservation_uses_requested_time(self):
+        from schedgym.scheduler import EasyScheduler
+
+        reservations = []
+        for actual in (10, 3):
+            s = EasyScheduler(10, 10, ignore_memory=True)
+            big = Job(1, 0, execution_time=actual, processors_allocated=6,
+                      requested_processors=6, requested_time=10)
+            nxt = Job(2, 0, execution_time=5, processors_allocated=6,
+                      requested_processors=6, requested_time=5)
+            for j in (big, nxt):
+                j.requested_memory = 0
+            s.submit([big, nxt])
+            s.step(1)
+            reservations.append(nxt.start_time)
+        # Reserved at the planned finish (0 + 10) in both cases.
+        self.assertEqual(reservations, [10, 10])
+
+    def test_backfilling_with_overestimates_never_double_books(self):
+        # Regression: a job finishing *now* must not be treated as still
+        # running until its requested time (EASY used to double-book).
+        from schedgym.scheduler import BackfillingScheduler, EasyScheduler
+
+        for cls in (EasyScheduler, BackfillingScheduler):
+            for seed in range(10):
+                with self.subTest(scheduler=cls.__name__, seed=seed):
+                    rng = random.Random(seed)
+                    s = cls(10, 10, ignore_memory=True)
+                    jid = 0
+                    for t in range(120):
+                        if rng.random() < 0.7:
+                            jid += 1
+                            run = rng.randint(1, 15)
+                            procs = rng.randint(1, 10)
+                            j = Job(jid, t, execution_time=run, processors_allocated=procs,
+                                    requested_processors=procs,
+                                    requested_time=run + rng.randint(0, 2 * run))
+                            j.requested_memory = 0
+                            j.resources.ignore_memory = True
+                            s.submit(j)
+                        s.step(1)  # raises AssertionError on a double booking
+                        self.assertLessEqual(s.cluster.processors.used_resources, 10)
+
+    def test_job_ending_early_frees_resources_at_actual_time(self):
+        s = self._running(actual=3)
+        s.forward_time()
+        s.forward_time()  # t=3: actual finish
+        self.assertEqual(s.cluster.processors.used_resources, 0)
+
+
 class TestKnownIssues(unittest.TestCase):
     """Each test here documents a bug. Expected to fail until fixed."""
 

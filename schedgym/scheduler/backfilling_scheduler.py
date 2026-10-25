@@ -23,7 +23,8 @@ class BackfillingScheduler(Scheduler):
             update_timeline,
         )
 
-        future_by_time, future_times = self.job_events.future_events_snapshot()
+        # Plan with requested (not actual) run times: see Scheduler.planned_events().
+        future_by_time, future_times = self.planned_events(self.current_time)
 
         base_memory_pool = None
         total_memory = 0
@@ -98,7 +99,7 @@ class BackfillingScheduler(Scheduler):
                 memory_amount=job.requested_memory if not self.ignore_memory else 0,
             )
             if not self.ignore_memory:
-                finish_time = start_time + job.execution_time
+                finish_time = start_time + job.requested_time
                 scheduled_allocations.append(
                     (start_time, finish_time, job.id, list(resources.memory))
                 )

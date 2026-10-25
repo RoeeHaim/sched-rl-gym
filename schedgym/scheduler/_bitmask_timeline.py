@@ -283,13 +283,12 @@ def update_timeline(
     allocated_mask: int,
     memory_amount: int = 0,
 ) -> None:
-    """Mark processors as occupied in ``[start_time, start_time + execution_time)``.
+    """Mark processors as occupied in ``[start_time, start_time + requested_time)``.
 
-    CRITICAL: Uses ``job.execution_time`` (actual occupation), NOT
-    ``job.requested_time``. This matches ``_add_job_events`` at scheduler.py
-    line 196.
+    Uses ``job.requested_time``: when planning, the scheduler only knows the
+    user's estimate, not the actual run time (see Scheduler.planned_events()).
     """
-    finish_time = start_time + job.execution_time
+    finish_time = start_time + job.requested_time
 
     ensure_boundary(timeline, start_time)
     ensure_boundary(timeline, finish_time)
