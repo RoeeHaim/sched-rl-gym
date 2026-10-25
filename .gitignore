@@ -50,3 +50,8 @@ benchmarks/*.json
 # Tooling artifacts
 .sisyphus/
 test/tmp*
+
+# Training and evaluation outputs
+models/
+eval/
+results.csv
