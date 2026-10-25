@@ -1144,6 +1144,78 @@ class TestSchedulers(unittest.TestCase):
                 )
 
 
+class TestSmdpRewardAndDiscounting(unittest.TestCase):
+    """The env reports raw per-time-unit rewards and the elapsed time (tau);
+    discounting is left to the agent."""
+
+    ENVS = ("DeepRM-v0", "CompactRM-v0")
+
+    def make(self, name):
+        random.seed(0)
+        env = gymnasium.make(
+            name, simulation_type="event_based", job_slots=5, time_limit=200,
+            disable_env_checker=True,
+        )
+        env.reset(seed=0)
+        u = env.unwrapped
+        # The episode starts empty at t=0: wait until a job can be scheduled.
+        for _ in range(100):
+            if self.first_schedulable_slot(u) is not None:
+                break
+            env.step(u.action_space.n - 1)
+        return env, u
+
+    def first_schedulable_slot(self, u):
+        for i, j in enumerate(u.scheduler.queue_admission[: u.action_space.n - 1]):
+            if u.scheduler.can_schedule_now(j):
+                return i
+        return None
+
+    def test_env_has_no_gamma(self):
+        for name in self.ENVS:
+            with self.subTest(env=name):
+                _, u = self.make(name)
+                self.assertFalse(hasattr(u, "gamma"))
+
+    def test_immediate_scheduling_has_zero_tau(self):
+        for name in self.ENVS:
+            with self.subTest(env=name):
+                env, u = self.make(name)
+                slot = self.first_schedulable_slot(u)
+                self.assertIsNotNone(slot)
+                t0 = u.scheduler.current_time
+                _, reward, _, _, info = env.step(slot)
+                self.assertEqual(u.scheduler.current_time, t0)
+                self.assertEqual(info["tau"], 0)
+                self.assertEqual(info["step_rewards"], [])
+                self.assertEqual(reward, 0.0)
+
+    def test_wait_reports_tau_and_keeps_first_tick_penalty(self):
+        for name in self.ENVS:
+            with self.subTest(env=name):
+                env, u = self.make(name)
+                self.assertGreater(len(u.scheduler.queue_admission), 0)
+                t0 = u.scheduler.current_time
+                _, reward, _, _, info = env.step(u.action_space.n - 1)  # wait
+                tau = u.scheduler.current_time - t0
+                self.assertGreater(tau, 0)
+                self.assertEqual(info["tau"], tau)
+                self.assertEqual(len(info["step_rewards"]), tau)
+                self.assertLess(info["step_rewards"][0], 0)
+                self.assertAlmostEqual(reward, sum(info["step_rewards"]))
+
+    def test_simulator_clock_tracks_scheduler_clock(self):
+        for name in self.ENVS:
+            with self.subTest(env=name):
+                env, u = self.make(name)
+                rng = np.random.default_rng(0)
+                for _ in range(100):
+                    _, _, done, _, _ = env.step(int(rng.integers(env.action_space.n)))
+                    self.assertEqual(u.simulator.current_time, u.scheduler.current_time)
+                    if done:
+                        break
+
+
 class TestSwfGenerator(unittest.TestCase):
     TOTAL_JOBS = 122060
     TEST_DIR = "test"

@@ -72,7 +72,9 @@ class BaseRmEnv(ABC, gymnasium.Env):
         self.reward_jobs = RewardJobs.from_str(kwargs.get("reward_jobs", "all"))
 
         self.smdp = self.simulation_type == SimulationType.EVENT_BASED
-        self.gamma = kwargs.get("gamma", 1.0)
+        # Note: there is deliberately no discount factor here. Discounting is
+        # an agent hyperparameter; the environment reports raw per-time-unit
+        # rewards and the elapsed time (tau) in `info` instead.
 
         self.time_horizon = kwargs.get(
             "time_horizon", TIME_HORIZON
@@ -227,6 +229,25 @@ class BaseRmEnv(ABC, gymnasium.Env):
 
     def compute_reward(self, joblist):
         return -np.sum([1 / j.execution_time for j in joblist if j.execution_time > 0])
+
+    def _collect_transition_rewards(
+        self, intermediate: list, elapsed_time: int, should_be_done: bool
+    ) -> tuple:
+        """Raw (undiscounted) rewards of one decision-to-decision transition.
+
+        Returns ``(reward, step_rewards, tau)`` where ``step_rewards[k]`` is the
+        reward of the k-th elapsed time unit, ``tau`` is the number of time
+        units that elapsed (the sojourn time) and ``reward == sum(step_rewards)``.
+        A scheduling action that does not advance time has ``tau == 0``.
+        Time units with no jobs in the system contribute a reward of 0 but are
+        still counted in ``tau``, because the agent's discounting depends on how
+        much time passed, not on whether anything was penalised.
+        """
+        if should_be_done or elapsed_time <= 0:
+            return 0.0, [], 0
+        step_rewards = [0.0 + float(self.compute_reward(js)) for js in intermediate]
+        tau = len(step_rewards)
+        return float(np.sum(step_rewards)), step_rewards, tau
 
     @property
     def reward(self):

@@ -83,6 +83,7 @@ class CompactRmEnv(BaseRmEnv):
         if not (0 <= action < self.action_space.n - 1):
             found = False
 
+        t_before = self.scheduler.current_time
         try:
             intermediate = self.simulator.rl_step(
                 action if found else None, self.reward_mapper[self.reward_jobs]
@@ -91,20 +92,20 @@ class CompactRmEnv(BaseRmEnv):
             intermediate = [[Job()]]
             should_be_done = True
             done = True
+        elapsed_time = self.scheduler.current_time - t_before
 
-        reward = self.reward if any(intermediate) else 0
         time_exceeded = bool(self.time_limit) and (
             self.scheduler.current_time > self.time_limit
         )
         done = time_exceeded or done or self.really_done()
 
-        if not done and self.smdp and any(intermediate) and not should_be_done:
-            rewards = [self.compute_reward(js) for js in intermediate]
-            if len(rewards) > 1:
-                rewards[0] = 0
-            reward = (self.gamma ** np.arange(len(intermediate))).dot(rewards)
-
-        return (self.state, reward, done, False, self.stats if done else {})
+        reward, step_rewards, tau = self._collect_transition_rewards(
+            intermediate, elapsed_time, should_be_done
+        )
+        info = {"step_rewards": step_rewards, "tau": tau}
+        if done:
+            info.update(self.stats)
+        return (self.state, reward, done, False, info)
 
     @property
     def state(self):
