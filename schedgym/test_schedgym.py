@@ -1041,9 +1041,17 @@ class TestSchedulers(unittest.TestCase):
         self.assertEqual(s.sjf_action(-1), jobs[0][-1])
 
         s.step(0)
-        self.assertEqual(s.all_jobs[0].status, job.JobStatus.WAITING)
+        scheduled = s.all_jobs[0]
+        self.assertEqual(scheduled.status, job.JobStatus.WAITING)
         s.forward_time()
-        self.assertEqual(s.all_jobs[0].status, job.JobStatus.RUNNING)
+        # After one time step the job is running, unless it was only one time
+        # step long: then it finished exactly now and must already be completed.
+        expected = (
+            job.JobStatus.COMPLETED
+            if min(scheduled.execution_time, scheduled.requested_time) <= 1
+            else job.JobStatus.RUNNING
+        )
+        self.assertEqual(scheduled.status, expected)
 
     def test_sjf_scheduler(self):
         s = scheduler.SjfScheduler(16, 2048)

@@ -70,9 +70,13 @@ class NullScheduler(Scheduler):
         For details, see :func:`step`.
         """
 
-        present = self.job_events.step(1)
-        self.cluster = self.play_events(present, self.cluster, update_queues=True)
+        # Advance the clock first, then apply every event up to and including
+        # the new current time. This keeps self.cluster in sync with
+        # current_time, so jobs that finish *now* have already released their
+        # resources when the agent makes its next decision.
         self.current_time += 1
+        present = self.job_events.step(self.current_time - self.job_events.time)
+        self.cluster = self.play_events(present, self.cluster, update_queues=True)
         self.schedule()
 
     @property
