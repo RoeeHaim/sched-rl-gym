@@ -1,7 +1,12 @@
 """Train a MaskablePPO agent on CompactRM-v0 (SMDP mode by default).
 
-Option A: standard PPO discounting (gamma per decision), not yet the
-two-stage SMDP discounting with tau.
+Two discounting modes (--discount):
+  smdp      (default) gamma is per *time unit*: the reward of a transition is
+            discounted inside it (stage 1) and the next state's value is
+            discounted by gamma**tau, tau = elapsed time (stage 2).
+            See scripts/smdp_ppo.py.
+  decision  standard PPO: gamma per decision, ignoring how much time passed
+            (the earlier "option A").
 
 Usage (from the sched-rl-gym folder):
     python scripts/train_ppo.py                          # 2M steps, 8 parallel envs
@@ -25,6 +30,7 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecMonitor, VecNormalize
 
 from ppo_utils import DEFAULT_CONFIG, make_env
+from smdp_ppo import SmdpMaskablePPO, VecSmdpReward
 
 # Training episodes use seeds far away from the evaluation seeds (0, 1, 2, ...),
 # so the agent is never evaluated on job sequences it was trained on.
@@ -41,7 +47,11 @@ def main():
     ap.add_argument("--processors", type=int, default=DEFAULT_CONFIG["processors"])
     ap.add_argument("--memory", action="store_true", help="model memory too")
     ap.add_argument("--rate", type=float, default=DEFAULT_CONFIG["rate"])
-    ap.add_argument("--gamma", type=float, default=0.99)
+    ap.add_argument("--discount", default="smdp", choices=["smdp", "decision"],
+                    help="smdp: gamma per time unit using tau; decision: gamma per decision")
+    ap.add_argument("--gamma", type=float, default=0.99,
+                    help="discount factor (per time unit with --discount smdp)")
+    ap.add_argument("--gae-lambda", type=float, default=0.95)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--n-steps", type=int, default=2048, help="steps per env per update")
     ap.add_argument("--batch-size", type=int, default=256)
@@ -68,7 +78,9 @@ def main():
     vec_cls = SubprocVecEnv if args.n_envs > 1 else DummyVecEnv
     envs = vec_cls([factory(i) for i in range(args.n_envs)])
     # VecMonitor logs episode return/length (rollout/ep_rew_mean in TensorBoard).
-    envs = VecMonitor(envs)
+    envs = VecMonitor(envs)  # below VecSmdpReward: logged returns stay raw/undiscounted
+    if args.discount == "smdp":
+        envs = VecSmdpReward(envs, gamma=args.gamma)  # stage 1: R_i from info["step_rewards"]
     # Rewards are -sum(1/execution_time) over jobs in the system, accumulated over
     # the elapsed time, so a single 'wait' can be worth -400. Unscaled, the value
     # loss swamps the policy loss and PPO collapses to 'always wait'. Only rewards
@@ -76,9 +88,10 @@ def main():
     if not args.no_norm_reward:
         envs = VecNormalize(envs, norm_obs=False, norm_reward=True, gamma=args.gamma)
 
-    model = MaskablePPO(
+    algo = SmdpMaskablePPO if args.discount == "smdp" else MaskablePPO
+    model = algo(
         "MlpPolicy", envs,
-        gamma=args.gamma, learning_rate=args.lr, n_steps=args.n_steps,
+        gamma=args.gamma, gae_lambda=args.gae_lambda, learning_rate=args.lr, n_steps=args.n_steps,
         batch_size=args.batch_size, ent_coef=args.ent_coef,
         seed=args.seed, tensorboard_log=str(out / "tb"), verbose=1,
     )
@@ -86,6 +99,7 @@ def main():
         save_freq=max(args.checkpoint_every // args.n_envs, 1),
         save_path=str(out / "checkpoints"), name_prefix="ppo",
     )
+    print(f"discount: {args.discount} (gamma={args.gamma}, lambda={args.gae_lambda})")
     print(f"training {args.timesteps} steps on {args.n_envs} envs, config {cfg}")
     print(f"output: {out}")
     t0 = time.time()
