@@ -152,7 +152,9 @@ class NullScheduler(Scheduler):
         limits = slice(0, limit if limit >= 0 else None)
         for i, job in enumerate(self.queue_admission[limits]):
             if self.sjf_lt(job, best):
-                if self.cluster.fits(job):
+                # can_schedule_now also accounts for jobs started at this same
+                # time step, which self.cluster does not include yet.
+                if self.can_schedule_now(job):
                     best = job
                     bestidx = i
         return bestidx
