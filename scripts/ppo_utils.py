@@ -19,6 +19,8 @@ DEFAULT_CONFIG = {
     "processors": 10,
     "memory": False,       # memory modelling off by default (bugs 11-13)
     "rate": 0.7,           # DeepRM job arrival rate
+    "estimates": None,     # None: requested_time == execution_time (exact estimates)
+    "estimate_noise": 0.5, # std of the estimate error, relative to the run time
 }
 
 
@@ -39,8 +41,24 @@ def env_kwargs(cfg: dict) -> dict:
             "max_job_len": 15,
             "small_job_chance": 0.8,
             "ignore_memory": not cfg["memory"],
+            **estimate_kwargs(cfg),
         },
         "disable_env_checker": True,
+    }
+
+
+def estimate_kwargs(cfg: dict) -> dict:
+    """DeepRM workload arguments for inaccurate run-time estimates.
+
+    With estimates the job's requested_time differs from its execution_time,
+    which is what real users submit. Older configs have no 'estimates' key and
+    keep exact estimates.
+    """
+    if not cfg.get("estimates"):
+        return {}
+    return {
+        "runtime_estimates": cfg["estimates"],
+        "estimate_parameters": cfg.get("estimate_noise", DEFAULT_CONFIG["estimate_noise"]),
     }
 
 

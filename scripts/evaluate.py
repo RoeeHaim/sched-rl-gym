@@ -29,7 +29,7 @@ import numpy as np
 
 import schedgym.envs  # noqa: F401  (registers the environments)
 from schedgym.envs.workload import build as build_workload
-from ppo_utils import action_mask, env_kwargs
+from ppo_utils import action_mask, env_kwargs, estimate_kwargs
 from schedgym.scheduler import (
     BackfillingScheduler,
     EasyScheduler,
@@ -124,6 +124,7 @@ def config_of(args) -> dict:
     return {
         "sim": args.sim, "slots": args.slots, "time_limit": args.time_limit,
         "processors": args.processors, "memory": args.memory, "rate": args.rate,
+        "estimates": args.estimates, "estimate_noise": args.estimate_noise,
     }
 
 
@@ -151,6 +152,7 @@ def workload_config(args, seed):
         "max_job_len": 15,
         "small_job_chance": 0.8,
         "ignore_memory": not args.memory,
+        **estimate_kwargs(config_of(args)),
     }
 
 
@@ -211,19 +213,29 @@ def main():
     ap.add_argument("--time-limit", type=int, default=200)
     ap.add_argument("--workload", default="deeprm", choices=["deeprm", "lublin"])
     ap.add_argument("--rate", type=float, default=0.7, help="DeepRM job arrival rate")
+    ap.add_argument("--estimates", default=None, choices=["gaussian-over", "gaussian", "gaussian-under"],
+                    help="inaccurate user run-time estimates (default: exact)")
+    ap.add_argument("--estimate-noise", type=float, default=0.5,
+                    help="std of the estimate error relative to the run time")
     ap.add_argument("--jobs", type=int, default=300, help="Lublin: number of jobs")
     ap.add_argument("--processors", type=int, default=10)
     ap.add_argument("--memory", action="store_true", help="model memory too (off by default: bugs 11-13)")
     ap.add_argument("--csv", default=None, help="also write the table to this CSV file")
     ap.add_argument("--model", default=None,
                     help="folder of a model trained with scripts/train_ppo.py; its environment "
-                         "settings override --sim/--slots/--time-limit/--processors/--memory/--rate")
+                         "settings override --sim/--slots/--time-limit/--processors/--memory/--rate "
+                         "(and --estimates, unless given here)")
     args = ap.parse_args()
     if args.model:
         with open(f"{args.model}/config.json") as f:
             cfg = json.load(f)["env"]
         args.sim, args.slots, args.time_limit = cfg["sim"], cfg["slots"], cfg["time_limit"]
         args.processors, args.memory, args.rate = cfg["processors"], cfg["memory"], cfg["rate"]
+        # --estimates on the command line wins, so a model trained with exact
+        # estimates can be tested on a workload with inaccurate ones.
+        if args.estimates is None and cfg.get("estimates"):
+            args.estimates = cfg["estimates"]
+            args.estimate_noise = cfg.get("estimate_noise", args.estimate_noise)
         args.workload = "deeprm"
     if args.workload == "lublin":
         args.time_limit = None

@@ -47,6 +47,11 @@ def main():
     ap.add_argument("--processors", type=int, default=DEFAULT_CONFIG["processors"])
     ap.add_argument("--memory", action="store_true", help="model memory too")
     ap.add_argument("--rate", type=float, default=DEFAULT_CONFIG["rate"])
+    ap.add_argument("--estimates", default=None, choices=["gaussian-over", "gaussian", "gaussian-under"],
+                    help="inaccurate user run-time estimates (default: exact). gaussian-over: users "
+                         "over-estimate, as in real traces. gaussian-under triggers bug 5")
+    ap.add_argument("--estimate-noise", type=float, default=DEFAULT_CONFIG["estimate_noise"],
+                    help="std of the estimate error relative to the run time (with --estimates)")
     ap.add_argument("--discount", default="smdp", choices=["smdp", "decision"],
                     help="smdp: gamma per time unit using tau; decision: gamma per decision")
     ap.add_argument("--gamma", type=float, default=0.99,
@@ -66,6 +71,7 @@ def main():
     cfg = {
         "sim": args.sim, "slots": args.slots, "time_limit": args.time_limit,
         "processors": args.processors, "memory": args.memory, "rate": args.rate,
+        "estimates": args.estimates, "estimate_noise": args.estimate_noise,
     }
     out = Path(args.out or f"models/ppo_{time.strftime('%Y%m%d-%H%M%S')}")
     out.mkdir(parents=True, exist_ok=True)
