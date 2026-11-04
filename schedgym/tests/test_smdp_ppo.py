@@ -19,7 +19,9 @@ try:
         AverageReward,
         Discounted,
         Paper,
+        SmdpMaskablePPO,
         SmdpMaskableRolloutBuffer,
+        VecSmdpReward,
         intra_option_reward,
         make_criterion,
     )
@@ -171,6 +173,52 @@ class TestCriteria(unittest.TestCase):
             make_criterion("nope", 0.9)
         with self.assertRaises(ValueError):
             AverageReward(rho_method="nope")
+
+
+
+@unittest.skipIf(SmdpMaskableRolloutBuffer is None, "sb3-contrib not installed")
+class TestTruncation(unittest.TestCase):
+    """A truncated episode bootstraps with discount(duration) * V(terminal), not gamma * V."""
+
+    def run_one_step(self, criterion, duration):
+        import gymnasium
+        from sb3_contrib.common.wrappers import ActionMasker
+        from stable_baselines3.common.vec_env import DummyVecEnv
+
+        class OneStep(gymnasium.Env):
+            observation_space = spaces.Box(-1, 1, (1,), np.float32)
+            action_space = spaces.Discrete(2)
+
+            def reset(self, *, seed=None, options=None):
+                super().reset(seed=seed)
+                return np.zeros(1, np.float32), {}
+
+            def step(self, action):
+                info = {"duration": duration, "step_rewards": [0.0] * duration}
+                return np.ones(1, np.float32), 0.0, False, True, info
+
+        env = DummyVecEnv([lambda: ActionMasker(OneStep(), lambda e: np.ones(2, bool))])
+        env = VecSmdpReward(env, criterion)
+        model = SmdpMaskablePPO("MlpPolicy", env, criterion=criterion, n_steps=1, batch_size=1,
+                                n_epochs=1, gamma=0.5)
+        # freeze the value of every state at 10 so the bootstrap is predictable
+        for p in model.policy.value_net.parameters():
+            th.nn.init.zeros_(p)
+        th.nn.init.constant_(model.policy.value_net.bias, 10.0)
+        _, callback = model._setup_learn(1, None)
+        callback.on_training_start(locals(), globals())
+        model.collect_rollouts(model.env, callback, model.rollout_buffer, 1)
+        return float(model.rollout_buffer.rewards[0, 0])
+
+    def test_discounted_bootstraps_with_gamma_to_the_duration(self):
+        # gamma = 0.5, duration = 3: 0.5 ** 3 * 10 = 1.25 (SB3 alone would add 0.5 * 10)
+        self.assertAlmostEqual(self.run_one_step(Discounted(0.5), 3), 1.25, places=4)
+
+    def test_paper_bootstraps_without_discount(self):
+        self.assertAlmostEqual(self.run_one_step(Paper(0.5), 3), 10.0, places=4)
+
+    def test_average_adds_no_bootstrap(self):
+        self.assertAlmostEqual(self.run_one_step(AverageReward(), 3), 0.0, places=4)
 
 
 if __name__ == "__main__":

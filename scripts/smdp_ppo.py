@@ -30,6 +30,7 @@ Criteria:
 from __future__ import annotations
 
 import numpy as np
+import torch as th
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.buffers import MaskableRolloutBuffer
 from stable_baselines3.common.vec_env import VecEnv, VecEnvWrapper
@@ -174,23 +175,46 @@ class VecSmdpReward(VecEnvWrapper):
 
 
 class _DurationRecorder(VecEnvWrapper):
-    """Thin pass-through that hands each step's durations to the rollout buffer.
+    """Hands each step's durations, and any truncation bootstrap, to the rollout buffer.
 
     ``MaskablePPO.collect_rollouts`` calls ``env.step`` and then
     ``rollout_buffer.add`` for the same transition, so the buffer can pick the
-    durations up in ``add``.
+    values up in ``add``.
+
+    On a truncated episode (time limit) SB3 would add ``gamma * V(terminal)``
+    with a per-decision gamma. Here the flag is cleared so SB3 skips that, and
+    the bootstrap is computed with the criterion instead:
+    ``discount(duration) * V(terminal)``. A continuing criterion needs none,
+    since its chain runs on into the state after the reset.
     """
 
-    def __init__(self, venv: VecEnv, buffer: "SmdpMaskableRolloutBuffer"):
+    def __init__(self, venv: VecEnv, buffer: "SmdpMaskableRolloutBuffer", model: "SmdpMaskablePPO"):
         super().__init__(venv)
         self.buffer = buffer
+        self.model = model
 
     def reset(self):
         return self.venv.reset()
 
     def step_wait(self):
         obs, rewards, dones, infos = self.venv.step_wait()
-        self.buffer.pending_taus = np.array([info["duration"] for info in infos], dtype=np.float32)
+        taus = np.array([info["duration"] for info in infos], dtype=np.float32)
+        bootstrap = np.zeros(len(infos), dtype=np.float32)
+        criterion = self.buffer.criterion
+        for i, (done, info) in enumerate(zip(dones, infos)):
+            if not (done and info.get("TimeLimit.truncated", False)):
+                continue
+            info["TimeLimit.truncated"] = False  # handled here, not by SB3
+            info["smdp_truncated"] = True
+            terminal = info.get("terminal_observation")
+            if terminal is None or criterion.continuing:
+                continue
+            terminal_obs = self.model.policy.obs_to_tensor(terminal)[0]
+            with th.no_grad():
+                value = float(self.model.policy.predict_values(terminal_obs)[0].item())
+            bootstrap[i] = float(criterion.discount(taus[i : i + 1])[0]) * value
+        self.buffer.pending_taus = taus
+        self.buffer.pending_bootstrap = bootstrap
         return obs, rewards, dones, infos
 
 
@@ -208,14 +232,19 @@ class SmdpMaskableRolloutBuffer(MaskableRolloutBuffer):
     def reset(self) -> None:
         self.taus = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.pending_taus = None
+        self.pending_bootstrap = None
         super().reset()
 
-    def add(self, *args, **kwargs) -> None:
+    def add(self, obs, action, reward, *args, **kwargs) -> None:
         if self.pending_taus is None:
             raise RuntimeError("duration missing: the buffer must be filled by SmdpMaskablePPO")
         self.taus[self.pos] = self.pending_taus
+        if self.pending_bootstrap is not None:
+            # value of the state where a truncated episode stopped
+            reward = np.asarray(reward, dtype=np.float32) + self.pending_bootstrap
         self.pending_taus = None
-        super().add(*args, **kwargs)
+        self.pending_bootstrap = None
+        super().add(obs, action, reward, *args, **kwargs)
 
     def compute_returns_and_advantage(self, last_values, dones) -> None:
         criterion = self.criterion if self.criterion is not None else Discounted(self.gamma)
@@ -266,7 +295,7 @@ class SmdpMaskablePPO(MaskablePPO):
 
     def collect_rollouts(self, env, callback, rollout_buffer, n_rollout_steps, use_masking=True):
         result = super().collect_rollouts(
-            _DurationRecorder(env, rollout_buffer), callback, rollout_buffer, n_rollout_steps, use_masking
+            _DurationRecorder(env, rollout_buffer, self), callback, rollout_buffer, n_rollout_steps, use_masking
         )
         for key, value in self.criterion.stats().items():
             self.logger.record(f"criterion/{key}", value)
