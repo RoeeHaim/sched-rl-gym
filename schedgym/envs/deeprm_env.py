@@ -3,7 +3,6 @@ import logging
 import gymnasium.spaces
 import numpy as np
 
-from ..job import Job
 from .base import BaseRmEnv
 from .simulator import DeepRmSimulator
 from .workload import DeepRmWorkloadGenerator
@@ -179,7 +178,6 @@ class DeepRmEnv(BaseRmEnv):
     def step(self, action: int):
         done = False
         found = False
-        should_be_done = False
         if 0 <= action < self.action_space.n - 1:
             action = self.find_slot_position(action)
             found = True
@@ -188,9 +186,9 @@ class DeepRmEnv(BaseRmEnv):
             intermediate = self.simulator.rl_step(
                 action if found else None, self.reward_mapper[self.reward_jobs]
             )
-        except StopIteration:
-            intermediate = [[Job()]]
-            should_be_done = True
+        except StopIteration as e:
+            # the workload ran out: keep the time units that did elapse
+            intermediate = getattr(e, "ticks", [])
             done = True
 
         done = bool(self.time_limit) and (
@@ -198,13 +196,7 @@ class DeepRmEnv(BaseRmEnv):
         )
 
         duration = self.scheduler.current_time - time_before
-        if should_be_done:
-            # The workload ran out inside this transition and the simulator
-            # did not return the time units it went through.
-            reward = self.reward
-            step_rewards = []
-        else:
-            reward, step_rewards = self._transition_rewards(intermediate, duration)
+        reward, step_rewards = self._transition_rewards(intermediate, duration)
 
         # Sojourn time of this transition: how many time units passed between
         # this decision and the next one (0 when a job was scheduled at once).

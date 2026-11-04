@@ -111,5 +111,36 @@ class TestStepRewards(unittest.TestCase):
                 self.assertGreater(checked, 0, "no multi-unit wait happened")
 
 
+
+class TestEndOfWorkload(unittest.TestCase):
+    def exhaust_after(self, env, n_calls):
+        """Make the workload raise StopIteration after n_calls more steps."""
+        wl = env.unwrapped.simulator.simulator.workload
+        original, calls = wl.step, {"n": 0}
+
+        def step(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] > n_calls:
+                raise StopIteration
+            return original(*args, **kwargs)
+
+        wl.step = step
+
+    def test_last_transition_keeps_its_time_units(self):
+        for env_id in ENV_IDS:
+            with self.subTest(env=env_id):
+                env = make_env(env_id)
+                env.unwrapped.compute_reward = lambda jobs: -1.0
+                env.reset(seed=0)
+                self.exhaust_after(env, 3)
+                for _ in range(50):
+                    _, reward, terminated, truncated, info = env.step(wait_action(env))
+                    self.assertEqual(len(info["step_rewards"]), info["duration"])
+                    self.assertAlmostEqual(reward, -info["duration"])
+                    if terminated or truncated:
+                        break
+                self.assertTrue(terminated or truncated)
+
+
 if __name__ == "__main__":
     unittest.main()

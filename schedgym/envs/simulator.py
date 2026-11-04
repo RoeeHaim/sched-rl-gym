@@ -85,6 +85,18 @@ class DeepRmSimulator:
         self.simulator = self.build()
 
 
+class WorkloadExhausted(StopIteration):
+    """The workload ran out in the middle of a transition.
+
+    ``ticks`` holds the jobs listed at every time unit that did elapse before
+    the workload ran out, so the environment can still charge for them.
+    """
+
+    def __init__(self, ticks: list[list[Job]]):
+        super().__init__("Workload finished")
+        self.ticks = ticks
+
+
 class EventBasedDeepRmSimulator:
     last_job_time: int
     scheduler: NullScheduler
@@ -127,7 +139,10 @@ class EventBasedDeepRmSimulator:
         jobs: list[list[Job]] = []
         self.current_time += 1
         while True:
-            j = self.workload.step()
+            try:
+                j = self.workload.step()
+            except StopIteration as e:
+                raise WorkloadExhausted(jobs) from e
             if j:
                 self.scheduler.submit(j)
                 self.last_job_time = self.current_time
@@ -180,7 +195,10 @@ class TimeBasedDeepRmSimulator:
             return [[]]
         else:
             self.current_time += 1
-            j = self.workload.step()
+            try:
+                j = self.workload.step()
+            except StopIteration as e:
+                raise WorkloadExhausted([]) from e
             if j:
                 self.scheduler.submit(j)
                 self.last_job_time = self.current_time

@@ -3,7 +3,6 @@ import logging
 import gymnasium.spaces
 import numpy as np
 
-from ..job import Job
 from .base import BaseRmEnv
 
 logger = logging.getLogger(__name__)
@@ -79,7 +78,6 @@ class CompactRmEnv(BaseRmEnv):
     def step(self, action: int):
         done = False
         found = True
-        should_be_done = False
         if not (0 <= action < self.action_space.n - 1):
             found = False
 
@@ -88,9 +86,9 @@ class CompactRmEnv(BaseRmEnv):
             intermediate = self.simulator.rl_step(
                 action if found else None, self.reward_mapper[self.reward_jobs]
             )
-        except StopIteration:
-            intermediate = [[Job()]]
-            should_be_done = True
+        except StopIteration as e:
+            # the workload ran out: keep the time units that did elapse
+            intermediate = getattr(e, "ticks", [])
             done = True
 
         time_exceeded = bool(self.time_limit) and (
@@ -99,13 +97,7 @@ class CompactRmEnv(BaseRmEnv):
         done = time_exceeded or done or self.really_done()
 
         duration = self.scheduler.current_time - time_before
-        if should_be_done:
-            # The workload ran out inside this transition and the simulator
-            # did not return the time units it went through.
-            reward = self.reward
-            step_rewards = []
-        else:
-            reward, step_rewards = self._transition_rewards(intermediate, duration)
+        reward, step_rewards = self._transition_rewards(intermediate, duration)
 
         # Sojourn time of this transition: how many time units passed between
         # this decision and the next one (0 when a job was scheduled at once).
