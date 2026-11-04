@@ -176,7 +176,7 @@ class DeepRmEnv(BaseRmEnv):
         return self.action_space.n - 1
 
     def step(self, action: int):
-        done = False
+        workload_done = False
         found = False
         if 0 <= action < self.action_space.n - 1:
             action = self.find_slot_position(action)
@@ -189,10 +189,15 @@ class DeepRmEnv(BaseRmEnv):
         except StopIteration as e:
             # the workload ran out: keep the time units that did elapse
             intermediate = getattr(e, "ticks", [])
-            done = True
+            workload_done = True
 
-        done = bool(self.time_limit) and (
-            self.scheduler.current_time > self.time_limit or done
+        # terminated: the workload is over. truncated: the time limit was
+        # reached while the task goes on, so the learner must bootstrap.
+        terminated = bool(self.time_limit) and workload_done
+        truncated = (
+            bool(self.time_limit)
+            and self.scheduler.current_time > self.time_limit
+            and not terminated
         )
 
         duration = self.scheduler.current_time - time_before
@@ -201,6 +206,6 @@ class DeepRmEnv(BaseRmEnv):
         # Sojourn time of this transition: how many time units passed between
         # this decision and the next one (0 when a job was scheduled at once).
         info = {"duration": duration, "step_rewards": step_rewards}
-        if done:
+        if terminated or truncated:
             info.update(self.stats)
-        return (self.state, reward, done, False, info)
+        return (self.state, reward, terminated, truncated, info)

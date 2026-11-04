@@ -142,5 +142,33 @@ class TestEndOfWorkload(unittest.TestCase):
                 self.assertTrue(terminated or truncated)
 
 
+
+class TestEpisodeEnd(unittest.TestCase):
+    def test_time_limit_is_a_truncation(self):
+        for env_id in ENV_IDS:
+            with self.subTest(env=env_id):
+                env = make_env(env_id, time_limit=30)
+                env.reset(seed=0)
+                for _ in range(1000):
+                    _, _, terminated, truncated, _ = env.step(wait_action(env))
+                    if terminated or truncated:
+                        break
+                self.assertTrue(truncated)
+                self.assertFalse(terminated)
+
+    def test_workload_end_is_a_termination(self):
+        for env_id in ENV_IDS:
+            with self.subTest(env=env_id):
+                env = make_env(env_id)
+                env.reset(seed=0)
+                TestEndOfWorkload.exhaust_after(None, env, 3)
+                for _ in range(50):
+                    _, _, terminated, truncated, _ = env.step(wait_action(env))
+                    if terminated or truncated:
+                        break
+                self.assertTrue(terminated)
+                self.assertFalse(truncated)
+
+
 if __name__ == "__main__":
     unittest.main()

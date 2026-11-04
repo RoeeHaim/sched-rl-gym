@@ -76,7 +76,7 @@ class CompactRmEnv(BaseRmEnv):
         )
 
     def step(self, action: int):
-        done = False
+        workload_done = False
         found = True
         if not (0 <= action < self.action_space.n - 1):
             found = False
@@ -89,12 +89,16 @@ class CompactRmEnv(BaseRmEnv):
         except StopIteration as e:
             # the workload ran out: keep the time units that did elapse
             intermediate = getattr(e, "ticks", [])
-            done = True
+            workload_done = True
 
         time_exceeded = bool(self.time_limit) and (
             self.scheduler.current_time > self.time_limit
         )
-        done = time_exceeded or done or self.really_done()
+        # terminated: the task itself is over (no more jobs to schedule).
+        # truncated: we stopped at the time limit, but the future goes on, so
+        # the learner must still bootstrap from the value of the last state.
+        terminated = workload_done or self.really_done()
+        truncated = time_exceeded and not terminated
 
         duration = self.scheduler.current_time - time_before
         reward, step_rewards = self._transition_rewards(intermediate, duration)
@@ -102,9 +106,9 @@ class CompactRmEnv(BaseRmEnv):
         # Sojourn time of this transition: how many time units passed between
         # this decision and the next one (0 when a job was scheduled at once).
         info = {"duration": duration, "step_rewards": step_rewards}
-        if done:
+        if terminated or truncated:
             info.update(self.stats)
-        return (self.state, reward, done, False, info)
+        return (self.state, reward, terminated, truncated, info)
 
     @property
     def state(self):
