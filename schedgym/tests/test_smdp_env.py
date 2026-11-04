@@ -74,6 +74,24 @@ class TestDuration(unittest.TestCase):
 
 
 class TestStepRewards(unittest.TestCase):
+    def test_one_raw_reward_per_elapsed_time_unit(self):
+        for env_id in ENV_IDS:
+            for sim in ("event_based", "time_based"):
+                with self.subTest(env=env_id, sim=sim):
+                    env = make_env(env_id, simulation_type=sim)
+                    env.reset(seed=0)
+                    for _ in range(200):
+                        _, reward, terminated, truncated, info = env.step(env.action_space.sample())
+                        self.assertEqual(len(info["step_rewards"]), info["duration"])
+                        self.assertAlmostEqual(reward, sum(info["step_rewards"]))
+                        self.assertTrue(all(r <= 0 for r in info["step_rewards"]))
+                        if terminated or truncated:
+                            break
+
+    def test_environment_does_not_discount(self):
+        env = make_env("CompactRM-v0")
+        self.assertFalse(hasattr(env.unwrapped, "gamma"))
+
     def test_every_elapsed_time_unit_is_penalised(self):
         # With a constant penalty of -1 per time unit, a wait of d units must
         # cost exactly -d: no time unit (in particular the first) is dropped.

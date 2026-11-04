@@ -72,7 +72,9 @@ class BaseRmEnv(ABC, gymnasium.Env):
         self.reward_jobs = RewardJobs.from_str(kwargs.get("reward_jobs", "all"))
 
         self.smdp = self.simulation_type == SimulationType.EVENT_BASED
-        self.gamma = kwargs.get("gamma", 1.0)
+        # No discount factor here: discounting (or averaging) is the learner's
+        # job. Each step reports raw per-time-unit rewards in
+        # info["step_rewards"] and the elapsed time in info["duration"].
 
         self.time_horizon = kwargs.get(
             "time_horizon", TIME_HORIZON
@@ -227,6 +229,19 @@ class BaseRmEnv(ABC, gymnasium.Env):
 
     def compute_reward(self, joblist):
         return -np.sum([1 / j.execution_time for j in joblist if j.execution_time > 0])
+
+    def _transition_rewards(self, intermediate: list, duration: int) -> tuple:
+        """Raw (undiscounted) rewards of one decision-to-decision transition.
+
+        Returns ``(reward, step_rewards)``: ``step_rewards[k]`` is the reward of
+        the k-th elapsed time unit and ``reward == sum(step_rewards)``. A
+        transition that does not advance time (a job started at once) has no
+        time units, so it returns ``(0.0, [])``.
+        """
+        if duration <= 0:
+            return 0.0, []
+        step_rewards = [float(self.compute_reward(jobs)) for jobs in intermediate]
+        return float(np.sum(step_rewards)), step_rewards
 
     @property
     def reward(self):

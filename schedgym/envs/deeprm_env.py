@@ -193,18 +193,22 @@ class DeepRmEnv(BaseRmEnv):
             should_be_done = True
             done = True
 
-        reward = self.reward if any(intermediate) else 0
         done = bool(self.time_limit) and (
             self.scheduler.current_time > self.time_limit or done
         )
 
-        if not done and self.smdp and any(intermediate) and not should_be_done:
-            rewards = [self.compute_reward(js) for js in intermediate]
-            reward = (self.gamma ** np.arange(len(intermediate))).dot(rewards)
+        duration = self.scheduler.current_time - time_before
+        if should_be_done:
+            # The workload ran out inside this transition and the simulator
+            # did not return the time units it went through.
+            reward = self.reward
+            step_rewards = []
+        else:
+            reward, step_rewards = self._transition_rewards(intermediate, duration)
 
         # Sojourn time of this transition: how many time units passed between
         # this decision and the next one (0 when a job was scheduled at once).
-        info = {"duration": self.scheduler.current_time - time_before}
+        info = {"duration": duration, "step_rewards": step_rewards}
         if done:
             info.update(self.stats)
         return (self.state, reward, done, False, info)
