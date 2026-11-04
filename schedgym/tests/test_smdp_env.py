@@ -72,5 +72,26 @@ class TestDuration(unittest.TestCase):
         self.assertGreaterEqual(info["duration"], 1)
 
 
+
+class TestStepRewards(unittest.TestCase):
+    def test_every_elapsed_time_unit_is_penalised(self):
+        # With a constant penalty of -1 per time unit, a wait of d units must
+        # cost exactly -d: no time unit (in particular the first) is dropped.
+        for env_id in ENV_IDS:
+            with self.subTest(env=env_id):
+                env = make_env(env_id)
+                env.unwrapped.compute_reward = lambda jobs: -1.0
+                env.reset(seed=0)
+                checked = 0
+                for _ in range(200):
+                    _, reward, terminated, truncated, info = env.step(wait_action(env))
+                    if terminated or truncated:
+                        break
+                    if info["duration"] > 1:
+                        self.assertAlmostEqual(reward, -info["duration"])
+                        checked += 1
+                self.assertGreater(checked, 0, "no multi-unit wait happened")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -200,8 +200,6 @@ class DeepRmEnv(BaseRmEnv):
 
         if not done and self.smdp and any(intermediate) and not should_be_done:
             rewards = [self.compute_reward(js) for js in intermediate]
-            if len(rewards) > 1:
-                rewards[0] = 0
             reward = (self.gamma ** np.arange(len(intermediate))).dot(rewards)
 
         # Sojourn time of this transition: how many time units passed between
