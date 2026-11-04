@@ -170,5 +170,77 @@ class TestEpisodeEnd(unittest.TestCase):
                 self.assertFalse(truncated)
 
 
+
+class TestActionMask(unittest.TestCase):
+    def test_mask_allows_exactly_the_jobs_that_fit_and_wait(self):
+        for env_id in ENV_IDS:
+            with self.subTest(env=env_id):
+                env = make_env(env_id)
+                env.reset(seed=0)
+                for _ in range(100):
+                    u = env.unwrapped
+                    mask = u.action_masks()
+                    self.assertEqual(mask.shape, (env.action_space.n,))
+                    self.assertTrue(mask[-1])
+                    queue = u.scheduler.queue_admission[: u.job_slots]
+                    for i in range(env.action_space.n - 1):
+                        fits = i < len(queue) and bool(u.scheduler.can_schedule_now(queue[i]))
+                        self.assertEqual(bool(mask[i]), fits)
+                    valid = np.flatnonzero(mask)
+                    _, _, terminated, truncated, _ = env.step(int(np.random.choice(valid)))
+                    if terminated or truncated:
+                        break
+
+    def test_masked_job_starts_at_once(self):
+        env = make_env("CompactRM-v0")
+        env.reset(seed=0)
+        for _ in range(100):
+            mask = env.unwrapped.action_masks()
+            if mask[:-1].any():
+                _, _, _, _, info = env.step(int(np.flatnonzero(mask[:-1])[0]))
+                self.assertEqual(info["duration"], 0)
+                return
+            env.step(wait_action(env))
+        self.skipTest("no job ever fit the cluster")
+
+
+class TestWaitMode(unittest.TestCase):
+    def test_invalid_wait_mode(self):
+        with self.assertRaises(ValueError):
+            make_env("CompactRM-v0", wait_mode="forever")
+
+    def test_next_event_wait_lasts_until_an_arrival_or_a_completion(self):
+        for env_id in ENV_IDS:
+            with self.subTest(env=env_id):
+                env = make_env(env_id, wait_mode="next_event")
+                env.reset(seed=0)
+                s = env.unwrapped.scheduler
+                checked = 0
+                for _ in range(200):
+                    s = env.unwrapped.scheduler
+                    seen = len(s.queue_completed) + len(s.jobs_in_system)
+                    done_jobs = len(s.queue_completed)
+                    _, _, terminated, truncated, info = env.step(wait_action(env))
+                    if terminated or truncated:
+                        break
+                    self.assertGreaterEqual(info["duration"], 1)
+                    arrived = len(s.queue_completed) + len(s.jobs_in_system) > seen
+                    finished = len(s.queue_completed) > done_jobs
+                    self.assertTrue(arrived or finished)
+                    checked += 1
+                self.assertGreater(checked, 0)
+
+    def test_unit_wait_is_one_time_unit_when_a_job_fits(self):
+        env = make_env("CompactRM-v0", wait_mode="unit")
+        env.reset(seed=0)
+        for _ in range(100):
+            if env.unwrapped.action_masks()[:-1].any():
+                _, _, _, _, info = env.step(wait_action(env))
+                self.assertEqual(info["duration"], 1)
+                return
+            env.step(wait_action(env))
+        self.skipTest("no job ever fit the cluster")
+
+
 if __name__ == "__main__":
     unittest.main()

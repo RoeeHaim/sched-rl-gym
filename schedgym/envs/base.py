@@ -70,6 +70,10 @@ class BaseRmEnv(ABC, gymnasium.Env):
         )
 
         self.reward_jobs = RewardJobs.from_str(kwargs.get("reward_jobs", "all"))
+        # How long "wait" lasts in the event-based simulator when a job already
+        # fits: "unit" (one time unit) or "next_event" (until a job arrives or
+        # finishes).
+        self.wait_mode = kwargs.get("wait_mode", "unit")
 
         self.smdp = self.simulation_type == SimulationType.EVENT_BASED
         # No discount factor here: discounting (or averaging) is the learner's
@@ -128,6 +132,7 @@ class BaseRmEnv(ABC, gymnasium.Env):
             scheduler,
             simulation_type=self.simulation_type,
             job_slots=self.job_slots,
+            wait_mode=self.wait_mode,
         )
 
     def reset(self, *, seed=None, options=None) -> tuple[np.ndarray, dict]:
@@ -229,6 +234,19 @@ class BaseRmEnv(ABC, gymnasium.Env):
 
     def compute_reward(self, joblist):
         return -np.sum([1 / j.execution_time for j in joblist if j.execution_time > 0])
+
+    def action_masks(self) -> np.ndarray:
+        """Valid actions right now, for MaskablePPO.
+
+        Action i (i < job_slots) is valid only if the i-th job in the queue
+        exists and can start now; picking a job that does not fit would just
+        behave like waiting. The last action ("wait") is always valid.
+        """
+        mask = np.zeros(self.action_space.n, dtype=bool)
+        for i, job in enumerate(self.scheduler.queue_admission[: self.job_slots]):
+            mask[i] = bool(self.scheduler.can_schedule_now(job))
+        mask[-1] = True
+        return mask
 
     def _transition_rewards(self, intermediate: list, duration: int) -> tuple:
         """Raw (undiscounted) rewards of one decision-to-decision transition.

@@ -25,6 +25,9 @@ class SimulationType(IntEnum):
             raise ValueError(f"{simulation_type} is not a valid SimulationType.")
 
 
+WAIT_MODES = ("unit", "next_event")
+
+
 class DeepRmSimulator:
     scheduler: NullScheduler
     workload: DeepRmWorkloadGenerator | SyntheticWorkloadGenerator
@@ -35,7 +38,11 @@ class DeepRmSimulator:
         scheduler: NullScheduler,
         simulation_type: SimulationType = SimulationType.TIME_BASED,
         job_slots: int | None = None,
+        wait_mode: str = "unit",
     ):
+        if wait_mode not in WAIT_MODES:
+            raise ValueError(f"wait_mode must be one of {WAIT_MODES}, not {wait_mode!r}")
+        self.wait_mode = wait_mode
         self.scheduler = scheduler
         self.workload = workload_generator
         self.simulation_type = simulation_type
@@ -59,6 +66,7 @@ class DeepRmSimulator:
                 self.workload,
                 self.scheduler,
                 self.job_slots,
+                wait_mode=self.wait_mode,
             )
         elif self.simulation_type == SimulationType.TIME_BASED:
             return TimeBasedDeepRmSimulator(
@@ -98,6 +106,13 @@ class WorkloadExhausted(StopIteration):
 
 
 class EventBasedDeepRmSimulator:
+    """Event-based (SMDP) simulator: the agent is asked only when a job fits.
+
+    ``wait_mode`` says how long the "wait" action lasts when a job already
+    fits: ``"unit"`` advances one time unit, ``"next_event"`` advances until
+    a job arrives or finishes.
+    """
+
     last_job_time: int
     scheduler: NullScheduler
     job_slots: slice
@@ -107,6 +122,7 @@ class EventBasedDeepRmSimulator:
         workload_generator: WorkloadGeneratorType,
         scheduler: NullScheduler,
         job_slots: slice,
+        wait_mode: str = "unit",
     ):
         if (
             not isinstance(workload_generator, DeepRmWorkloadGenerator)
@@ -119,6 +135,7 @@ class EventBasedDeepRmSimulator:
         self.simulation_start_time = 0
         self.workload = workload_generator
         self.job_slots = job_slots
+        self.wait_mode = wait_mode
 
         self.current_time = self.last_job_time = 0
         if isinstance(workload_generator, SyntheticWorkloadGenerator):
@@ -137,6 +154,8 @@ class EventBasedDeepRmSimulator:
             return [[]]
 
         jobs: list[list[Job]] = []
+        completed_before = len(self.scheduler.queue_completed)
+        event = self.wait_mode == "unit"  # "unit": any time unit is enough
         self.current_time += 1
         while True:
             try:
@@ -146,9 +165,12 @@ class EventBasedDeepRmSimulator:
             if j:
                 self.scheduler.submit(j)
                 self.last_job_time = self.current_time
+                event = True
             self.scheduler.forward_time()
             jobs.append(listjobs())
-            if self.scheduler.some_job_fits(self.job_slots):
+            if len(self.scheduler.queue_completed) > completed_before:
+                event = True
+            if event and self.scheduler.some_job_fits(self.job_slots):
                 break
         return jobs
 
