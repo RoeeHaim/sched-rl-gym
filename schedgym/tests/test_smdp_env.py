@@ -242,5 +242,46 @@ class TestWaitMode(unittest.TestCase):
         self.skipTest("no job ever fit the cluster")
 
 
+
+class TestClockFeatures(unittest.TestCase):
+    def run_until_queue(self, env):
+        for _ in range(200):
+            if env.unwrapped.scheduler.queue_admission:
+                return
+            env.step(wait_action(env))
+        self.skipTest("the queue never filled")
+
+    def test_default_observation_is_unchanged(self):
+        a, b = make_env("CompactRM-v0"), make_env("CompactRM-v0", job_time_feature="submission",
+                                                  include_time_left=True)
+        oa, _ = a.reset(seed=0)
+        ob, _ = b.reset(seed=0)
+        np.testing.assert_array_equal(oa, ob)
+
+    def test_age_feature_uses_waiting_time(self):
+        env = make_env("CompactRM-v0", job_time_feature="age")
+        env.reset(seed=0)
+        self.run_until_queue(env)
+        u = env.unwrapped
+        job = u.scheduler.queue_admission[0]
+        _, jobs, _ = u.scheduler.state(u.time_horizon, u.job_slots, u.smdp)
+        age = u.scheduler.current_time - job.submission_time
+        expected = (np.sign(age) * np.log(abs(age) + np.e) - 1 + 1) / (np.log(u.time_limit) + 1)
+        self.assertAlmostEqual(float(u._normalize_jobs(jobs)[0][0]), expected, places=5)
+
+    def test_time_left_can_be_turned_off(self):
+        env = make_env("CompactRM-v0", include_time_left=False)
+        env.reset(seed=0)
+        for _ in range(20):
+            obs, _, terminated, truncated, _ = env.step(wait_action(env))
+            self.assertEqual(obs[-1], 0.0)
+            if terminated or truncated:
+                break
+
+    def test_invalid_job_time_feature(self):
+        with self.assertRaises(ValueError):
+            make_env("CompactRM-v0", job_time_feature="clock")
+
+
 if __name__ == "__main__":
     unittest.main()

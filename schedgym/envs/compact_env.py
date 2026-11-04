@@ -41,6 +41,18 @@ class CompactRmEnv(BaseRmEnv):
 
         self.renderer = kwargs.get("renderer", None)
 
+        # Features that depend on the absolute clock. "submission" (default)
+        # describes each queued job by its submission time; "age" by how long
+        # it has been waiting, which does not grow with the clock. time_left
+        # only makes sense with an episodic time limit; without it the slot is 0.
+        self.job_time_feature = kwargs.get("job_time_feature", "submission")
+        if self.job_time_feature not in ("submission", "age"):
+            raise ValueError(
+                "job_time_feature must be 'submission' or 'age', "
+                f"not {self.job_time_feature!r}"
+            )
+        self.include_time_left = kwargs.get("include_time_left", True)
+
         self.maximum_work = self.processors
         self.maximum_work_mem = self.memory
 
@@ -207,8 +219,10 @@ class CompactRmEnv(BaseRmEnv):
         )
 
         queue_size = min(len(self.scheduler.queue_admission) / 1000.0, 1.0)
-        time_left = 1 - np.log(self.scheduler.current_time + 1) / np.log(
-            self.time_limit
+        time_left = (
+            1 - np.log(self.scheduler.current_time + 1) / np.log(self.time_limit)
+            if self.include_time_left
+            else 0.0
         )
 
         try:
@@ -252,12 +266,19 @@ class CompactRmEnv(BaseRmEnv):
 
         ret = np.zeros((len(jobs), len(jobs[0])), dtype=np.float32)
         for i, job in enumerate(jobs):
+            if self.job_time_feature == "age":
+                # empty slots (requested_processors == -1) get age 0
+                t = (
+                    max(self.scheduler.current_time - job.submission_time, 0)
+                    if job.requested_processors >= 0
+                    else 0
+                )
+            else:
+                t = job.submission_time
             _sumdiv(
                 ret[i],
                 0,
-                np.sign(job.submission_time)
-                * np.log(np.abs(job.submission_time) + np.e)
-                - 1,
+                np.sign(t) * np.log(np.abs(t) + np.e) - 1,
                 np.log(self.time_limit),
             )
             _sumdiv(
