@@ -183,6 +183,7 @@ class DeepRmEnv(BaseRmEnv):
         if 0 <= action < self.action_space.n - 1:
             action = self.find_slot_position(action)
             found = True
+        time_before = self.scheduler.current_time
         try:
             intermediate = self.simulator.rl_step(
                 action if found else None, self.reward_mapper[self.reward_jobs]
@@ -203,4 +204,9 @@ class DeepRmEnv(BaseRmEnv):
                 rewards[0] = 0
             reward = (self.gamma ** np.arange(len(intermediate))).dot(rewards)
 
-        return (self.state, reward, done, False, self.stats if done else {})
+        # Sojourn time of this transition: how many time units passed between
+        # this decision and the next one (0 when a job was scheduled at once).
+        info = {"duration": self.scheduler.current_time - time_before}
+        if done:
+            info.update(self.stats)
+        return (self.state, reward, done, False, info)
