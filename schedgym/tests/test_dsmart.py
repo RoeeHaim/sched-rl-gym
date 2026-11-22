@@ -129,6 +129,15 @@ class TestContinuingEnv(unittest.TestCase):
         self.assertGreater(total, 0)
         self.assertGreater(len(env.scheduler.queue_completed), 0)
 
+    def test_reward_scale_and_eval_overrides(self):
+        final = run({"algo": "DS", "time_budget": 300, "n_envs": 2, "batch_T": 32,
+                     "eval_time": 100, "eval_warmup": 20, "eval_seeds": [1],
+                     "reward_scale": 0.1, "entropy_warmup_iters": 2,
+                     "eval_workload_overrides": [{"new_job_rate": 0.1},
+                                                 {"new_job_rate": 0.15}],
+                     "verbose": False})
+        self.assertTrue(math.isfinite(final["eval_sample_reward_rate"]))
+
     def test_run_smoke(self):
         final = run({"algo": "DS", "time_budget": 300, "n_envs": 2, "batch_T": 32,
                      "eval_time": 100, "eval_warmup": 20, "eval_seeds": [1],

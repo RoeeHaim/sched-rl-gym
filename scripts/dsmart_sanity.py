@@ -25,7 +25,7 @@ def check(path, window=10):
     half = tr[len(tr) // 2 :]
     out = {"file": path, "algo": algo, "iters": len(tr)}
 
-    rho = np.array([r["rho"] for r in half])
+    rho = np.array([r.get("rho_raw", r["rho"]) for r in half])
     if algo == "DS":
         target = np.array([r["cum_rate"] for r in half])
     else:

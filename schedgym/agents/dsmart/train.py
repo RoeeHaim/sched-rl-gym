@@ -107,11 +107,21 @@ DEFAULTS: dict[str, Any] = {
     # time-limit truncation (bootstrapped, masked out of the loss) and reset.
     # None disables it.
     "max_queue": None,
+    # Multiply training rewards by this before the agent sees them (logs stay
+    # in raw units). rho, V and the advantages scale with it, but the critic's
+    # squared loss shares one gradient-norm clip with the policy, so very
+    # large costs (bursty real traces) let the value loss crowd out the
+    # policy gradient. Pick ~1/|typical rate|.
+    "reward_scale": 1.0,
     # --- evaluation ---
     "eval_every": 20_000,  # simulated time units between evaluations
     "eval_time": 5_000,  # time units measured per evaluation rollout
     "eval_warmup": 500,  # time units discarded first (fill the cluster)
     "eval_seeds": [10_001, 10_002],
+    # Optional list of workload overrides, one eval run each (seeds cycled),
+    # e.g. [{"offset": 0}, {"offset": 7000}, ...] to evaluate different
+    # stretches of an SWF trace instead of replaying only its beginning.
+    "eval_workload_overrides": None,
     # --- output ---
     "log_path": None,
     "save_path": None,
@@ -237,9 +247,19 @@ def evaluate(cfg: dict, policy, seeds=None) -> dict:
     taus = []
     slowdowns = []
     queue_end = []
-    for seed in seeds:
+    overrides = cfg.get("eval_workload_overrides") or [None]
+    runs = (
+        [(seeds[i % len(seeds)], ov) for i, ov in enumerate(overrides)]
+        if overrides != [None]
+        else [(seed, None) for seed in seeds]
+    )
+    for seed, ov in runs:
+        run_cfg = cfg
+        if ov:
+            run_cfg = copy.deepcopy(cfg)
+            run_cfg["env_kwargs"]["workload"].update(ov)
         with _GlobalRngState(seed):
-            env = make_env(cfg)
+            env = make_env(run_cfg)
             obs, _ = env.reset(seed=seed)
             t = 0
             n_completed_at_warmup = None
@@ -403,7 +423,8 @@ def run(config: dict | None = None) -> dict:
                     o, _ = e.reset()
                     resets += 1
                 nxt[i] = o
-            buf.add(obs, a, rew, term, trunc, v, logp, time=dur, mask=masks)
+            buf.add(obs, a, rew * cfg["reward_scale"], term, trunc, v, logp,
+                    time=dur, mask=masks)
             obs = nxt
             batch_R += float(rew.sum())
             batch_T += float(dur.sum())
@@ -427,6 +448,7 @@ def run(config: dict | None = None) -> dict:
             "queue_mean": float(np.mean([len(e.scheduler.queue_admission) for e in envs])),
             "wall": _time.time() - t_start,
             **stats,
+            "rho_raw": stats["rho"] / cfg["reward_scale"],
         }
         log(_clean(rec))
         if it % 10 == 0 or it == 1:
@@ -450,7 +472,7 @@ def run(config: dict | None = None) -> dict:
     final = {
         "kind": "final", "algo": cfg["algo"], "iters": it, "sim_time": sim_time,
         "decisions": decisions, "train_cum_rate": cum_R / cum_T if cum_T else None,
-        "rho": agent.rho, "wall": _time.time() - t_start,
+        "rho": agent.rho / cfg["reward_scale"], "wall": _time.time() - t_start,
         "eval_reward_rate": last_eval.get("greedy_reward_rate"),
         "eval_sample_reward_rate": last_eval.get("sample_reward_rate"),
         "eval_mean_slowdown": last_eval.get("greedy_mean_slowdown"),
