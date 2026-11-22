@@ -121,13 +121,23 @@ DEFAULTS: dict[str, Any] = {
 }
 
 
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Copy of ``base`` with ``override`` merged in, recursing into dicts, so
+    ``env_kwargs.workload.new_job_rate`` alone keeps the other workload keys."""
+    out = copy.deepcopy(base)
+    for k, v in override.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = copy.deepcopy(v)
+    return out
+
+
 def resolve_config(config: dict | None = None) -> dict:
     cfg = copy.deepcopy(DEFAULTS)
     for k, v in (config or {}).items():
         if k == "env_kwargs":
-            env_kwargs = copy.deepcopy(DEFAULT_ENV_KWARGS)
-            env_kwargs.update(v)
-            cfg[k] = env_kwargs
+            cfg[k] = _deep_merge(DEFAULT_ENV_KWARGS, v)
         elif k not in DEFAULTS:
             raise KeyError(f"unknown config key {k!r}")
         else:

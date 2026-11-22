@@ -92,6 +92,13 @@ class TestContinuingEnv(unittest.TestCase):
             self.assertFalse(term)
         self.assertGreater(env.scheduler.current_time, 200)
 
+    def test_nested_env_override_keeps_workload_defaults(self):
+        cfg = resolve_config({"env_kwargs": {"workload": {"new_job_rate": 0.2}}})
+        wl = cfg["env_kwargs"]["workload"]
+        self.assertEqual(wl["new_job_rate"], 0.2)
+        self.assertEqual(wl["type"], "deeprm")
+        self.assertEqual(cfg["env_kwargs"]["job_time_feature"], "age")
+
     def test_run_smoke(self):
         final = run({"algo": "DS", "time_budget": 300, "n_envs": 2, "batch_T": 32,
                      "eval_time": 100, "eval_warmup": 20, "eval_seeds": [1],
