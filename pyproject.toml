@@ -41,6 +41,11 @@ parallelworkloads = { git = "https://github.com/renatolfc/parallelworkloads.git"
 parallelworkloads = ["cython", "setuptools"]
 
 [project.optional-dependencies]
+rl = [
+    "torch>=2.0",
+    "stable-baselines3>=2.0",
+    "sb3-contrib>=2.0",
+]
 render = [
     "matplotlib",
     "pyglet",
@@ -58,7 +63,7 @@ docs = [
     "nbsphinx",
 ]
 all = [
-    "sched-rl-gym[render,test,docs]",
+    "sched-rl-gym[render,test,docs,rl]",
 ]
 
 [project.urls]

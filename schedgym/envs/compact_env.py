@@ -103,7 +103,7 @@ class CompactRmEnv(BaseRmEnv):
             intermediate = getattr(e, "ticks", [])
             workload_done = True
 
-        time_exceeded = bool(self.time_limit) and (
+        time_exceeded = self.truncate and (
             self.scheduler.current_time > self.time_limit
         )
         # terminated: the task itself is over (no more jobs to schedule).

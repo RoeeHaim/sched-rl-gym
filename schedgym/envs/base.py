@@ -13,6 +13,7 @@ MAXIMUM_NUMBER_OF_ACTIVE_JOBS = 40  # Number of colors in image
 MAX_TIME_TRACKING_SINCE_LAST_JOB = 10
 
 TIME_HORIZON = 20
+TIME_LIMIT = 200
 JOB_SLOTS = 5
 AMOUNT_OF_MEMORY = 10
 NUMBER_OF_PROCESSORS = 10
@@ -86,13 +87,19 @@ class BaseRmEnv(ABC, gymnasium.Env):
 
         self.tolerance_factor = kwargs.get("tolerance_factor", 100)
 
-        time_limit = kwargs.get("time_limit", 200)
+        # time_limit=None means "no time limit": a trace workload derives one
+        # from the trace at reset (tolerance_factor * end of trace); any other
+        # workload never truncates (continuing task). The observation still
+        # needs a fixed time scale to normalise by, which is ``obs_time_scale``.
+        time_limit = kwargs.get("time_limit", TIME_LIMIT)
         if time_limit is None:
-            self.time_limit = np.e
+            self.time_limit = kwargs.get("obs_time_scale", TIME_LIMIT)
             self.update_time_limit = True
+            self.truncate = False
         else:
             self.time_limit = time_limit
             self.update_time_limit = False
+            self.truncate = bool(time_limit)
 
         step = 1.0 / self.job_num_cap
         # zero is already present and set to "no job there"
@@ -146,6 +153,7 @@ class BaseRmEnv(ABC, gymnasium.Env):
                 wl.trace[-1].submission_time  # type: ignore
                 + wl.trace[-1].execution_time  # type: ignore
             )
+            self.truncate = True
         self.simulator.reset(wl, scheduler)
         return self.state, {}
 

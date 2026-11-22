@@ -195,7 +195,7 @@ class DeepRmEnv(BaseRmEnv):
         # reached while the task goes on, so the learner must bootstrap.
         terminated = bool(self.time_limit) and workload_done
         truncated = (
-            bool(self.time_limit)
+            self.truncate
             and self.scheduler.current_time > self.time_limit
             and not terminated
         )
