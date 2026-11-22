@@ -442,6 +442,7 @@ def run(config: dict | None = None) -> dict:
                     "rho": agent.rho, "value_bias": agent.value_bias},
                    cfg["save_path"])
     tail = [g for (_, g, _) in eval_curve[-3:]]
+    tail_s = [s for (_, _, s) in eval_curve[-3:]]
     final = {
         "kind": "final", "algo": cfg["algo"], "iters": it, "sim_time": sim_time,
         "decisions": decisions, "train_cum_rate": cum_R / cum_T if cum_T else None,
@@ -450,6 +451,10 @@ def run(config: dict | None = None) -> dict:
         "eval_sample_reward_rate": last_eval.get("sample_reward_rate"),
         "eval_mean_slowdown": last_eval.get("greedy_mean_slowdown"),
         "eval_reward_rate_last3": float(np.mean(tail)) if tail else None,
+        # The sampled policy is the robust headline: argmax can lock into
+        # "wait" forever (a fitting job is never started, the state barely
+        # changes), which the stochastic policy escapes.
+        "eval_sample_reward_rate_last3": float(np.mean(tail_s)) if tail_s else None,
     }
     log(_clean(final))
     log.close()
