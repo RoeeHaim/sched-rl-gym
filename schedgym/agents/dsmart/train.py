@@ -138,6 +138,10 @@ def resolve_config(config: dict | None = None) -> dict:
     for k, v in (config or {}).items():
         if k == "env_kwargs":
             cfg[k] = _deep_merge(DEFAULT_ENV_KWARGS, v)
+            wl = v.get("workload")
+            if wl and wl.get("type", DEFAULT_WORKLOAD["type"]) != DEFAULT_WORKLOAD["type"]:
+                # another workload model: its keys replace, not extend, the default
+                cfg[k]["workload"] = copy.deepcopy(wl)
         elif k not in DEFAULTS:
             raise KeyError(f"unknown config key {k!r}")
         else:

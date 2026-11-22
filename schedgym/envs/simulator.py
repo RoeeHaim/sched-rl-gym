@@ -8,8 +8,9 @@ from schedgym.envs.workload import (
 )
 from schedgym.job import Job
 from schedgym.scheduler import NullScheduler
+from schedgym.workload import TraceGenerator
 
-WorkloadGeneratorType = DeepRmWorkloadGenerator | SyntheticWorkloadGenerator
+WorkloadGeneratorType = DeepRmWorkloadGenerator | TraceGenerator
 
 
 class SimulationType(IntEnum):
@@ -126,7 +127,7 @@ class EventBasedDeepRmSimulator:
     ):
         if (
             not isinstance(workload_generator, DeepRmWorkloadGenerator)
-            and not isinstance(workload_generator, SyntheticWorkloadGenerator)
+            and not isinstance(workload_generator, TraceGenerator)
         ) or not isinstance(scheduler, NullScheduler):
             raise AssertionError("Invalid arguments received.")
 
@@ -138,7 +139,7 @@ class EventBasedDeepRmSimulator:
         self.wait_mode = wait_mode
 
         self.current_time = self.last_job_time = 0
-        if isinstance(workload_generator, SyntheticWorkloadGenerator):
+        if isinstance(workload_generator, TraceGenerator):
             first_job_time = cast(Job, workload_generator.peek()).submission_time - 1
             workload_generator.current_time = first_job_time
             scheduler.job_events.time = first_job_time
@@ -188,7 +189,7 @@ class TimeBasedDeepRmSimulator:
     ):
         if (
             not isinstance(workload_generator, DeepRmWorkloadGenerator)
-            and not isinstance(workload_generator, SyntheticWorkloadGenerator)
+            and not isinstance(workload_generator, TraceGenerator)
         ) or not isinstance(scheduler, NullScheduler):
             raise AssertionError("Invalid arguments received.")
 
@@ -198,7 +199,7 @@ class TimeBasedDeepRmSimulator:
         self.current_time = self.last_job_time = 0
         self.job_slots = job_slots
 
-        if isinstance(workload_generator, SyntheticWorkloadGenerator):
+        if isinstance(workload_generator, TraceGenerator):
             first_job_time = cast(Job, workload_generator.peek()).submission_time - 1
             workload_generator.current_time = first_job_time
             scheduler.job_events.time = first_job_time

@@ -239,6 +239,72 @@ class SyntheticWorkloadGenerator(wl.TraceGenerator):
         return self.trace
 
 
+def build_swf(
+    tracefile,
+    processors=None,
+    cluster_processors=None,
+    time_scale=1,
+    offset=0,
+    length=None,
+    restart=True,
+    ignore_memory=True,
+):
+    """Trace workload from a Standard Workload Format (SWF) file (.swf or .swf.gz).
+
+    Parameters
+    ----------
+        tracefile : str
+            Path to the SWF log, e.g. one from the Parallel Workloads Archive.
+        processors : int, optional
+            Processors of the traced machine; read from the ``; MaxProcs:``
+            header when omitted.
+        cluster_processors : int, optional
+            Processors of the simulated cluster (the env's ``processors``).
+            When given, job sizes are rescaled proportionally
+            (``ceil(size * cluster_processors / processors)``) so that the trace
+            keeps its relative load on a smaller cluster.
+        time_scale : int
+            Seconds per simulated time unit. SWF times are in seconds; the
+            simulator advances one unit per step, so e.g. ``60`` turns the trace
+            into minutes. Times are rounded up and floored at 1.
+        offset, length : int
+            Use jobs ``[offset, offset + length)`` of the trace.
+        restart : bool
+            Loop over the trace when it ends (needed for continuing training).
+        ignore_memory : bool
+            Most SWF logs have no usable memory field; keep True and run the
+            env with ``ignore_memory=True``.
+    """
+    from schedgym.workload import SwfGenerator
+
+    gen = SwfGenerator(
+        tracefile,
+        processors,
+        0,
+        offset=offset,
+        length=length,
+        restart=restart,
+        ignore_memory=ignore_memory,
+    )
+    trace_procs = processors or max(j.requested_processors for j in gen.trace)
+    t0 = gen.trace[0].submission_time if gen.trace else 0
+    for j in gen.trace:
+        j.submission_time = (j.submission_time - t0) // time_scale
+        j.execution_time = max(1, math.ceil(j.execution_time / time_scale))
+        j.requested_time = max(
+            j.execution_time, math.ceil(j.requested_time / time_scale)
+        )
+        if cluster_processors:
+            j.requested_processors = min(
+                cluster_processors,
+                max(1, math.ceil(j.requested_processors * cluster_processors / trace_procs)),
+            )
+            j.processors_allocated = j.requested_processors
+        if ignore_memory:
+            j.requested_memory = 0
+    return gen
+
+
 def build(workload_config: dict):
     type = workload_config["type"]
     kwargs = {k: v for k, v in workload_config.items() if k != "type"}
@@ -246,5 +312,7 @@ def build(workload_config: dict):
         return DeepRmWorkloadGenerator.build(**kwargs)
     elif type == "lublin":
         return SyntheticWorkloadGenerator(**kwargs)
+    elif type == "swf":
+        return build_swf(**kwargs)
     else:
         raise RuntimeError(f"Unsupported workload model type {type} requested")

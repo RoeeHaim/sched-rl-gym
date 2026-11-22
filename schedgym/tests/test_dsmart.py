@@ -99,6 +99,36 @@ class TestContinuingEnv(unittest.TestCase):
         self.assertEqual(wl["type"], "deeprm")
         self.assertEqual(cfg["env_kwargs"]["job_time_feature"], "age")
 
+    def test_swf_workload(self):
+        import tempfile
+
+        lines = ["; MaxProcs: 64"]
+        for i in range(1, 41):
+            # id submit wait run procs cpu mem reqprocs reqtime reqmem status ...
+            lines.append(f"{i} {i * 120} 0 {300 + 60 * (i % 7)} {2 ** (i % 7)} "
+                         f"-1 -1 {2 ** (i % 7)} 900 -1 1 1 1 1 1 1 -1 -1")
+        with tempfile.NamedTemporaryFile("w", suffix=".swf", delete=False) as f:
+            f.write("\n".join(lines) + "\n")
+        wl = {"type": "swf", "tracefile": f.name, "cluster_processors": 10,
+              "time_scale": 60}
+        cfg = resolve_config({"env_kwargs": {"workload": wl, "ignore_memory": True}})
+        self.assertNotIn("new_job_rate", cfg["env_kwargs"]["workload"])
+        from schedgym.agents.dsmart.train import make_env
+
+        env = make_env(cfg)
+        env.reset(seed=0)
+        sizes = [j.requested_processors for j in env.simulator.workload.trace]
+        self.assertLessEqual(max(sizes), 10)
+        self.assertEqual(env.simulator.workload.trace[0].submission_time, 0)
+        total = 0
+        for _ in range(300):
+            mask = env.action_masks()
+            fit = np.flatnonzero(mask[:-1])
+            _, r, term, trunc, info = env.step(int(fit[0]) if len(fit) else len(mask) - 1)
+            total += info["duration"]
+        self.assertGreater(total, 0)
+        self.assertGreater(len(env.scheduler.queue_completed), 0)
+
     def test_run_smoke(self):
         final = run({"algo": "DS", "time_budget": 300, "n_envs": 2, "batch_T": 32,
                      "eval_time": 100, "eval_warmup": 20, "eval_seeds": [1],
