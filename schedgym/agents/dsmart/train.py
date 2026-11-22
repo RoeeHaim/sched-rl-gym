@@ -100,6 +100,13 @@ DEFAULTS: dict[str, Any] = {
     "value_loss_coeff": 1.0,
     "entropy_loss_coeff": None,  # PPO only (DSMART sets it from the pressure)
     "discount": None,  # None: 1.0 for average-reward agents, 0.99 for PPO
+    # Overload guard (training envs only). A continuing queue has no natural
+    # reset: an early, poor policy lets the backlog grow so large that the
+    # training envs never return to the operating region the evaluation
+    # measures. When a training env's queue exceeds max_queue it is treated as a
+    # time-limit truncation (bootstrapped, masked out of the loss) and reset.
+    # None disables it.
+    "max_queue": None,
     # --- evaluation ---
     "eval_every": 20_000,  # simulated time units between evaluations
     "eval_time": 5_000,  # time units measured per evaluation rollout
@@ -361,7 +368,7 @@ def run(config: dict | None = None) -> dict:
             next_eval += cfg["eval_every"]
         buf = RolloutBuffer()
         batch_R = batch_T = 0.0
-        resets = 0
+        resets = overloads = 0
         for _ in range(cfg["batch_T"]):
             masks = np.stack([e.action_masks() for e in envs])
             a, v, logp = agent.act(obs, masks)
@@ -373,6 +380,11 @@ def run(config: dict | None = None) -> dict:
             for i, e in enumerate(envs):
                 o, r, te, tr, info = e.step(int(a[i]))
                 rew[i], dur[i], term[i], trunc[i] = r, info["duration"], te, tr
+                if (cfg["max_queue"] is not None and not te
+                        and len(e.scheduler.queue_admission) > cfg["max_queue"]):
+                    tr = True
+                    trunc[i] = 1.0
+                    overloads += 1
                 if te or tr:
                     o, _ = e.reset()
                     resets += 1
@@ -397,6 +409,8 @@ def run(config: dict | None = None) -> dict:
             "tau_mean_pos": float(times[times > 0].mean()) if (times > 0).any() else float("nan"),
             "frac_tau0": float((times == 0).float().mean()),
             "resets": resets,
+            "overloads": overloads,
+            "queue_mean": float(np.mean([len(e.scheduler.queue_admission) for e in envs])),
             "wall": _time.time() - t_start,
             **stats,
         }
