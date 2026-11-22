@@ -6,8 +6,6 @@ import warnings
 import itertools
 from math import log2
 from collections import namedtuple
-from parallelworkloads.lublin99 import Lublin99
-from parallelworkloads.tsafrir05 import Tsafrir05
 
 from schedgym import workload as wl, job
 
@@ -187,6 +185,10 @@ class SyntheticWorkloadGenerator(wl.TraceGenerator):
         """
         random.seed(random_seed)
 
+        # Imported here so the DeepRM workload works without the compiled
+        # parallelworkloads extension (it does not build on native Windows).
+        from parallelworkloads.lublin99 import Lublin99
+
         self.lublin = Lublin99(False, random_seed, length)
         self.lublin.start = start_time
         self.random_seed = random_seed
@@ -219,6 +221,8 @@ class SyntheticWorkloadGenerator(wl.TraceGenerator):
             if self.runtime_estimates == "tsafrir":
                 if self.estimate_parameters is not None:
                     warnings.warn("Setting tsafrir parameters is currently unsupported")
+                from parallelworkloads.tsafrir05 import Tsafrir05
+
                 tsafrir = Tsafrir05(jobs)
                 jobs = tsafrir.generate(jobs)
             elif self.runtime_estimates == "gaussian":
