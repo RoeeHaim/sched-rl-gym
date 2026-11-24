@@ -99,6 +99,9 @@ class Scheduler(ABC):
         self.job_events = EventQueue(self.current_time - 1)
         self.cluster = Cluster(number_of_processors, total_memory, ignore_memory)
         self.need_schedule_call = False
+        # Actual runtimes of each user's most recently completed jobs, for the
+        # user-history runtime predictor (Tsafrir et al. 2007).
+        self._user_runtimes: dict[int, list[int]] = {}
         # Tracks whether we might need to schedule jobs
         self._queued_work_total: int = 0
 
@@ -172,6 +175,11 @@ class Scheduler(ABC):
         """
         self.queue_running.remove(j)
         self.queue_completed.append(j)
+        if j.user_id >= 0:
+            hist = self._user_runtimes.setdefault(j.user_id, [])
+            hist.append(j.execution_time)
+            if len(hist) > 2:
+                del hist[0]
 
         j.status = JobStatus.COMPLETED
         j.finish_time = j.start_time + j.execution_time
@@ -181,6 +189,21 @@ class Scheduler(ABC):
         self.completed_makespan = max(self.completed_makespan, j.finish_time)
         self.completed_slowdown_sum += j.slowdown
         self.completed_bounded_slowdown_sum += j.bounded_slowdown
+
+    def _predict_runtime(self, job: Job) -> int:
+        """Runtime estimate from information a real scheduler has at submit.
+
+        The mean of the actual runtimes of the user's last two completed jobs
+        (Tsafrir, Etsion and Feitelson 2007), never above the user's requested
+        time. Falls back to the requested time when the user has no history.
+        """
+        hist = self._user_runtimes.get(job.user_id) if job.user_id >= 0 else None
+        if not hist:
+            return job.requested_time
+        pred = -(-sum(hist) // len(hist))  # ceil of the mean
+        if job.requested_time > 0:
+            pred = min(pred, job.requested_time)
+        return max(1, pred)
 
     def _add_job_events(self, job: Job, time: int) -> tuple[JobEvent, JobEvent]:
         """Adds start and finish events for a job to the current events.
@@ -496,6 +519,7 @@ class Scheduler(ABC):
             )
         job.submission_time = self.current_time
         job.status = JobStatus.SUBMITTED
+        job.predicted_time = self._predict_runtime(job)
 
         # Compute statistics to be used in state representation {{{
         job.queue_size = len(self.queue_admission)
@@ -507,7 +531,13 @@ class Scheduler(ABC):
         self._queued_work_total += job.requested_time * job.requested_processors
         self.requested_processors_in_system += job.requested_processors
 
-    def state(self, timesteps: int, job_slots: int, smdp: bool = False):
+    def state(
+        self,
+        timesteps: int,
+        job_slots: int,
+        smdp: bool = False,
+        hide_runtime: bool = False,
+    ):
         """Returns the current state of the cluster as viewed by the scheduler.
 
         The state representation used here is deeply inspired by the DeepRM
@@ -528,12 +558,33 @@ class Scheduler(ABC):
             smdp : bool
                 Whether this is an SMDP and steps should be based on events,
                 not time
+            hide_runtime : bool
+                Place the finish of running and scheduled jobs at their
+                requested end (start + requested time) instead of their actual
+                end, which a real scheduler cannot know.
         """
         # Gets all events between now and `timesteps` {{{
         near_future: dict[int, list[JobEvent]] = defaultdict(list)
+        if hide_runtime:
+            future = sorted(
+                (
+                    JobEvent(
+                        max(e.time, e.job.start_time + e.job.requested_time),
+                        e.type,
+                        e.job,
+                    )
+                    if e.type == EventType.JOB_FINISH and e.job.requested_time > 0
+                    else e
+                    for e in self.job_events
+                    if e.time >= self.current_time
+                ),
+                key=lambda e: e.time,
+            )
+        else:
+            future = None
         if smdp:
             last_time = 0
-            for e in self.job_events:
+            for e in self.job_events if future is None else future:
                 if e.time < self.current_time:
                     continue
                 last_time = e.time - self.current_time
@@ -552,9 +603,14 @@ class Scheduler(ABC):
                     if i < timesteps
                 }
         else:
-            for e in self.job_events.events_between(
-                self.current_time, self.current_time + timesteps
-            ):
+            events = (
+                self.job_events.events_between(
+                    self.current_time, self.current_time + timesteps
+                )
+                if future is None
+                else (e for e in future if e.time < self.current_time + timesteps)
+            )
+            for e in events:
                 near_future[e.time - self.current_time].append(e)
         # }}}
 

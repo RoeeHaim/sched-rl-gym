@@ -158,6 +158,9 @@ class Job:
         self.finish_time: int = -1
         self.ignore_memory = ignore_memory
         self.slot_position: int = -1
+        # Runtime the scheduler expects, set on submission (see
+        # Scheduler._predict_runtime); -1 until then.
+        self.predicted_time: int = -1
         self.free_processors = -1
         self.queued_work = -1
         self.queue_size = -1

@@ -44,7 +44,7 @@ import schedgym.envs  # noqa: F401  (registers the environments)
 from .deep_smart import ALGOS, make_agent
 from .ppo import RolloutBuffer
 
-HEURISTICS = ("SJF", "FIRST", "RANDOM")
+HEURISTICS = ("SJF", "FIRST", "RANDOM", "SJF_PRED", "SJF_ORACLE")
 
 DEFAULT_WORKLOAD = {
     "type": "deeprm",
@@ -214,6 +214,10 @@ def heuristic_action(env, name: str, rng: np.random.Generator) -> int:
     if name == "FIRST":
         return int(fitting[0])
     queue = env.scheduler.queue_admission
+    if name == "SJF_PRED":  # user-history runtime estimate
+        return int(min(fitting, key=lambda i: queue[i].predicted_time))
+    if name == "SJF_ORACLE":  # actual runtime: an upper bound, not deployable
+        return int(min(fitting, key=lambda i: queue[i].execution_time))
     return int(min(fitting, key=lambda i: queue[i].requested_time))  # SJF
 
 

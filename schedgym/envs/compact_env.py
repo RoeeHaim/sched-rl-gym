@@ -52,6 +52,18 @@ class CompactRmEnv(BaseRmEnv):
                 f"not {self.job_time_feature!r}"
             )
         self.include_time_left = kwargs.get("include_time_left", True)
+        # Runtime information. hide_actual_runtime: the resource timeline shows
+        # running jobs ending at their requested end, not their actual one.
+        # runtime_feature: one extra feature per job slot, "predicted"
+        # (user-history estimate) or "oracle" (actual runtime, diagnostic only).
+        self.hide_actual_runtime = kwargs.get("hide_actual_runtime", False)
+        self.runtime_feature = kwargs.get("runtime_feature", None)
+        if self.runtime_feature not in (None, "predicted", "oracle"):
+            raise ValueError(
+                "runtime_feature must be None, 'predicted' or 'oracle', "
+                f"not {self.runtime_feature!r}"
+            )
+        self._slot_width = 8 + (self.runtime_feature is not None)
 
         self.maximum_work = self.processors
         self.maximum_work_mem = self.memory
@@ -59,7 +71,7 @@ class CompactRmEnv(BaseRmEnv):
         self._state_buffer_size = (
             self.time_horizon
             + self.time_horizon * (1 if self.ignore_memory else 2) * 2
-            + self.job_slots * 8
+            + self.job_slots * self._slot_width
             + 1
             + 3
             + 4
@@ -125,7 +137,7 @@ class CompactRmEnv(BaseRmEnv):
     @property
     def state(self):
         state, jobs, backlog = self.scheduler.state(
-            self.time_horizon, self.job_slots, self.smdp
+            self.time_horizon, self.job_slots, self.smdp, self.hide_actual_runtime
         )
 
         snapshots = len(state[0])
@@ -159,7 +171,10 @@ class CompactRmEnv(BaseRmEnv):
             )
             ptr += snapshots * 2
 
-        jobs_flat = self._normalize_jobs(jobs).reshape((-1,))
+        jobs_arr = self._normalize_jobs(jobs)
+        if self.runtime_feature is not None:
+            jobs_arr = np.hstack([jobs_arr, self._runtime_column(len(jobs_arr))])
+        jobs_flat = jobs_arr.reshape((-1,))
         jobs_end = ptr + len(jobs_flat)
         self._state_buffer[ptr:jobs_end] = jobs_flat
         ptr = jobs_end
@@ -259,6 +274,21 @@ class CompactRmEnv(BaseRmEnv):
 
         # Ensure we return exactly self._state_buffer_size elements, we can pad with 0
         return self._state_buffer[: self._state_buffer_size]
+
+    def _runtime_column(self, n):
+        """Predicted (or actual) runtime of each slot's job, scaled like the
+        requested time; 0 for empty slots."""
+        col = np.zeros((n, 1), dtype=np.float32)
+        log_limit = np.log(self.time_limit)
+        for i, job in enumerate(self.scheduler.queue_admission[:n]):
+            t = (
+                job.predicted_time
+                if self.runtime_feature == "predicted"
+                else job.execution_time
+            )
+            if t > 0:
+                col[i, 0] = (np.log(t + np.e) - 1 + 1) / (log_limit + 1)
+        return col
 
     def _normalize_jobs(self, jobs):
         def _sumdiv(arr, idx, orig, limit):
