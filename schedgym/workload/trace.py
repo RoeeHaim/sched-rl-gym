@@ -4,6 +4,7 @@ Inherits from the base WorkloadGenerator and uses the swf_parser to parse SWF
 files.
 """
 
+import copy
 from collections.abc import Callable, Iterator, Sequence
 
 from ..job import Job
@@ -22,11 +23,29 @@ class TraceGenerator(WorkloadGenerator):
         self.current_time = 0
         self.restart = restart
         self.current_element = 0
+        # Untouched copy of the trace, taken on the first step (after any
+        # rescaling done by the caller), used to start each new lap fresh.
+        self._pristine: list[Job] | None = None
 
         if trace is not None:
             self.trace = trace
         else:
             self.trace = []
+
+    def _restart_lap(self) -> None:
+        """Start a new lap of the trace at the current time.
+
+        Each lap is a fresh deep copy of the original jobs, shifted by the time
+        the lap starts. Re-using the job objects of the previous lap would keep
+        their run state, and adding the lap start to already shifted times
+        would add a growing idle gap before every lap after the second.
+        """
+        assert self._pristine is not None
+        base = self.current_time
+        self.trace = copy.deepcopy(self._pristine)
+        for job in self.trace:
+            job.submission_time += base
+        self.current_element = 0
 
     def step(self, offset: int = 1) -> list[Job | None]:
         """ "Samples" jobs from the trace file.
@@ -38,12 +57,20 @@ class TraceGenerator(WorkloadGenerator):
         """
         if offset < 0:
             raise ValueError("Submission time must be positive")
+        if self.restart and self.refresh_jobs is None and self._pristine is None:
+            t0 = self.trace[0].submission_time if self.trace else 0
+            self._pristine = copy.deepcopy(list(self.trace))
+            for job in self._pristine:
+                job.submission_time -= t0
         if self.current_element >= len(self.trace):
             if self.restart:
-                self.current_element = 0
-                for job in self.trace:
-                    job.submission_time += self.current_time
-                if self.refresh_jobs is not None:
+                if self.refresh_jobs is None:
+                    self._restart_lap()
+                else:
+                    # generated workloads draw a new job list for each lap
+                    self.current_element = 0
+                    for job in self.trace:
+                        job.submission_time += self.current_time
                     self.refresh_jobs()
             else:
                 raise StopIteration("Workload finished")
