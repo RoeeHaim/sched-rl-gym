@@ -215,7 +215,8 @@ def heuristic_action(env, name: str, rng: np.random.Generator) -> int:
         return int(fitting[0])
     queue = env.scheduler.queue_admission
     if name == "SJF_PRED":  # user-history runtime estimate
-        return int(min(fitting, key=lambda i: queue[i].predicted_time))
+        predict = env.scheduler.predict_runtime  # uses finished jobs only
+        return int(min(fitting, key=lambda i: predict(queue[i])))
     if name == "SJF_ORACLE":  # actual runtime: an upper bound, not deployable
         return int(min(fitting, key=lambda i: queue[i].execution_time))
     return int(min(fitting, key=lambda i: queue[i].requested_time))  # SJF

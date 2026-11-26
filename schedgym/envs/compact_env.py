@@ -282,7 +282,7 @@ class CompactRmEnv(BaseRmEnv):
         log_limit = np.log(self.time_limit)
         for i, job in enumerate(self.scheduler.queue_admission[:n]):
             t = (
-                job.predicted_time
+                self.scheduler.predict_runtime(job)
                 if self.runtime_feature == "predicted"
                 else job.execution_time
             )

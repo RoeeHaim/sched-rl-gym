@@ -87,3 +87,28 @@ def test_hidden_runtime_moves_finishes_to_the_requested_end(tmp_path):
     real, hidden = finish_offsets(False), finish_offsets(True)
     assert real == job.start_time + job.execution_time - sched.current_time
     assert hidden == job.start_time + job.requested_time - sched.current_time
+
+
+def test_ewma_ratio_prediction_uses_only_finished_jobs():
+    s = NullScheduler(10, 0, ignore_memory=True)
+    s.runtime_predictor = "ewma_ratio"
+    s.ratio_alpha = 0.3
+    first = _job(1, 3, run=5, req=10)
+    assert s.predict_runtime(first) == 10  # nothing finished yet
+    for jid, (run, req) in enumerate([(5, 10), (2, 10)], 10):
+        j = _job(jid, 3, run=run, req=req)
+        s.queue_running.append(j)
+        j.start_time = 0
+        s._complete_job(j)
+    # EWMA: 0.5, then 0.3 * 0.2 + 0.7 * 0.5 = 0.41
+    assert abs(s._user_ratio[3] - 0.41) < 1e-9
+    assert s.predict_runtime(_job(20, 3, run=1, req=100)) == 41
+    assert s.predict_runtime(_job(21, 4, run=1, req=100)) == 100  # other user
+
+
+def test_env_passes_the_predictor_choice(tmp_path):
+    env = _env(tmp_path, runtime_feature="predicted", runtime_predictor="ewma_ratio")
+    env.reset(seed=0)
+    assert env.scheduler.runtime_predictor == "ewma_ratio"
+    with pytest.raises(ValueError):
+        _env(tmp_path, runtime_predictor="nope")

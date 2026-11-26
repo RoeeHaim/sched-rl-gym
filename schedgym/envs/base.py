@@ -127,6 +127,15 @@ class BaseRmEnv(ABC, gymnasium.Env):
         self.memory = kwargs.get("memory", AMOUNT_OF_MEMORY)
         self.processors = kwargs.get("processors", NUMBER_OF_PROCESSORS)
         self.ignore_memory = kwargs.get("ignore_memory", False)
+        # Runtime predictor behind predicted runtimes ("tsafrir" or
+        # "ewma_ratio") and the EWMA rate of the latter.
+        self.runtime_predictor = kwargs.get("runtime_predictor", "tsafrir")
+        if self.runtime_predictor not in ("tsafrir", "ewma_ratio"):
+            raise ValueError(
+                "runtime_predictor must be 'tsafrir' or 'ewma_ratio', "
+                f"not {self.runtime_predictor!r}"
+            )
+        self.ratio_alpha = kwargs.get("ratio_alpha", 0.3)
 
         self.workload_config = kwargs.get("workload", DEFAULT_WORKLOAD)
         wl = build_workload(self.workload_config)
@@ -134,6 +143,7 @@ class BaseRmEnv(ABC, gymnasium.Env):
         scheduler = NullScheduler(
             self.processors, self.memory, ignore_memory=self.ignore_memory
         )
+        self._configure_predictor(scheduler)
         self.simulator = DeepRmSimulator(
             wl,
             scheduler,
@@ -142,11 +152,16 @@ class BaseRmEnv(ABC, gymnasium.Env):
             wait_mode=self.wait_mode,
         )
 
+    def _configure_predictor(self, scheduler) -> None:
+        scheduler.runtime_predictor = self.runtime_predictor
+        scheduler.ratio_alpha = self.ratio_alpha
+
     def reset(self, *, seed=None, options=None) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed, options=options)
         scheduler = NullScheduler(
             self.processors, self.memory, ignore_memory=self.ignore_memory
         )
+        self._configure_predictor(scheduler)
         wl = build_workload(self.workload_config)
         if self.update_time_limit and hasattr(wl, "trace") and wl.trace:
             self.time_limit = self.tolerance_factor * (

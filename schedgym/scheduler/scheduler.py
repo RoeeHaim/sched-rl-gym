@@ -5,6 +5,7 @@ that interacts with all other components.
 """
 
 import copy
+import math
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Iterable
@@ -102,6 +103,11 @@ class Scheduler(ABC):
         # Actual runtimes of each user's most recently completed jobs, for the
         # user-history runtime predictor (Tsafrir et al. 2007).
         self._user_runtimes: dict[int, list[int]] = {}
+        # "tsafrir": mean of the user's last two runtimes. "ewma_ratio":
+        # requested time x EWMA of the user's actual/requested ratio.
+        self.runtime_predictor = "tsafrir"
+        self.ratio_alpha = 0.3
+        self._user_ratio: dict[int, float] = {}
         # Tracks whether we might need to schedule jobs
         self._queued_work_total: int = 0
 
@@ -180,6 +186,14 @@ class Scheduler(ABC):
             hist.append(j.execution_time)
             if len(hist) > 2:
                 del hist[0]
+            if j.requested_time > 0:
+                ratio = min(j.execution_time / j.requested_time, 1.0)
+                prev = self._user_ratio.get(j.user_id)
+                self._user_ratio[j.user_id] = (
+                    ratio
+                    if prev is None
+                    else self.ratio_alpha * ratio + (1 - self.ratio_alpha) * prev
+                )
 
         j.status = JobStatus.COMPLETED
         j.finish_time = j.start_time + j.execution_time
@@ -190,13 +204,27 @@ class Scheduler(ABC):
         self.completed_slowdown_sum += j.slowdown
         self.completed_bounded_slowdown_sum += j.bounded_slowdown
 
-    def _predict_runtime(self, job: Job) -> int:
-        """Runtime estimate from information a real scheduler has at submit.
+    def predict_runtime(self, job: Job) -> int:
+        """Runtime estimate from jobs that have already finished.
 
-        The mean of the actual runtimes of the user's last two completed jobs
-        (Tsafrir, Etsion and Feitelson 2007), never above the user's requested
-        time. Falls back to the requested time when the user has no history.
+        Uses only completed jobs, so it can be called at any time without
+        looking ahead. Never above the user's requested time, at least 1, and
+        the requested time when the user has no finished job yet.
+
+        * ``tsafrir``: mean actual runtime of the user's last two completed
+          jobs (Tsafrir, Etsion and Feitelson 2007).
+        * ``ewma_ratio``: requested time x EWMA(alpha=ratio_alpha) of the
+          user's actual/requested ratios.
         """
+        if self.runtime_predictor == "ewma_ratio":
+            ratio = self._user_ratio.get(job.user_id) if job.user_id >= 0 else None
+            if ratio is None or job.requested_time <= 0:
+                return job.requested_time
+            return max(1, min(job.requested_time, math.ceil(job.requested_time * ratio)))
+        return self._predict_runtime(job)
+
+    def _predict_runtime(self, job: Job) -> int:
+        """User-history (Tsafrir) estimate; see :meth:`predict_runtime`."""
         hist = self._user_runtimes.get(job.user_id) if job.user_id >= 0 else None
         if not hist:
             return job.requested_time
@@ -519,7 +547,7 @@ class Scheduler(ABC):
             )
         job.submission_time = self.current_time
         job.status = JobStatus.SUBMITTED
-        job.predicted_time = self._predict_runtime(job)
+        job.predicted_time = self.predict_runtime(job)
 
         # Compute statistics to be used in state representation {{{
         job.queue_size = len(self.queue_admission)
